@@ -1,5 +1,6 @@
 package com.ideiasmidias.security.filter;
 
+import com.ideiasmidias.security.model.AdminUserPrincipal;
 import com.ideiasmidias.security.service.CustomAdminUserDetailsService;
 import com.ideiasmidias.security.service.JwtService;
 import jakarta.servlet.FilterChain;
@@ -51,7 +52,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                 UserDetails userDetails = customAdminUserDetailsService.loadUserByUsername(username);
 
-                if (jwtService.isTokenValid(token, userDetails)) {
+                if (userDetails instanceof AdminUserPrincipal principal
+                        && Boolean.TRUE.equals(principal.getIsActive())
+                        && jwtService.isTokenValid(token, userDetails)) {
+
                     UsernamePasswordAuthenticationToken authentication =
                             new UsernamePasswordAuthenticationToken(
                                     userDetails,
@@ -64,7 +68,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 }
             }
         } catch (Exception ignored) {
-            // invalid token -> request continues unauthenticated, security config will block protected routes
+            // invalid token -> continue unauthenticated
         }
 
         filterChain.doFilter(request, response);
