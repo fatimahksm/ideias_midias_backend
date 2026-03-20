@@ -12,6 +12,7 @@ import java.util.List;
 public class AdminUserPrincipal implements UserDetails {
 
     private final Long id;
+    private final String fullName;
     private final String email;
     private final String password;
     private final Boolean isActive;
@@ -19,6 +20,7 @@ public class AdminUserPrincipal implements UserDetails {
 
     public AdminUserPrincipal(AdminUser adminUser) {
         this.id = adminUser.getId();
+        this.fullName = adminUser.getFullName();
         this.email = adminUser.getEmail();
         this.password = adminUser.getPasswordHash();
         this.isActive = adminUser.getIsActive();

@@ -1,13 +1,18 @@
 package com.ideiasmidias.media.controller;
 
 import com.ideiasmidias.common.enums.MediaType;
+import com.ideiasmidias.common.exception.UnauthorizedException;
 import com.ideiasmidias.common.response.ApiResponse;
 import com.ideiasmidias.media.dto.MediaLibraryResponse;
 import com.ideiasmidias.media.service.MediaLibraryService;
+import com.ideiasmidias.security.model.AdminUserPrincipal;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -17,6 +22,27 @@ import java.util.List;
 public class MediaLibraryController {
 
     private final MediaLibraryService mediaLibraryService;
+
+    @PostMapping("/upload")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    public ResponseEntity<ApiResponse<MediaLibraryResponse>> upload(
+            @RequestParam("file") MultipartFile file,
+            @AuthenticationPrincipal AdminUserPrincipal principal
+    ) {
+        if (principal == null) {
+            throw new UnauthorizedException("Authentication required");
+        }
+
+        MediaLibraryResponse response = mediaLibraryService.upload(file, principal.getId());
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(
+                ApiResponse.<MediaLibraryResponse>builder()
+                        .success(true)
+                        .message("Media uploaded successfully")
+                        .data(response)
+                        .build()
+        );
+    }
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
