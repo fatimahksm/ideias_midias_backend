@@ -24,7 +24,7 @@ public class MediaLibraryController {
     private final MediaLibraryService mediaLibraryService;
 
     @PostMapping("/upload")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<MediaLibraryResponse>> upload(
             @RequestParam("file") MultipartFile file,
             @AuthenticationPrincipal AdminUserPrincipal principal
@@ -45,7 +45,7 @@ public class MediaLibraryController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<MediaLibraryResponse>> getById(@PathVariable Long id) {
         MediaLibraryResponse response = mediaLibraryService.getById(id);
 
@@ -59,7 +59,7 @@ public class MediaLibraryController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<MediaLibraryResponse>>> getAll() {
         List<MediaLibraryResponse> response = mediaLibraryService.getAll();
 
@@ -73,7 +73,7 @@ public class MediaLibraryController {
     }
 
     @GetMapping("/type/{fileType}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<MediaLibraryResponse>>> getByType(@PathVariable MediaType fileType) {
         List<MediaLibraryResponse> response = mediaLibraryService.getByType(fileType);
 
@@ -87,7 +87,7 @@ public class MediaLibraryController {
     }
 
     @GetMapping("/uploader/{adminUserId}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<MediaLibraryResponse>>> getByUploader(@PathVariable Long adminUserId) {
         List<MediaLibraryResponse> response = mediaLibraryService.getByUploader(adminUserId);
 
@@ -101,7 +101,7 @@ public class MediaLibraryController {
     }
 
     @GetMapping("/uploader/{adminUserId}/type/{fileType}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<MediaLibraryResponse>>> getByUploaderAndType(
             @PathVariable Long adminUserId,
             @PathVariable MediaType fileType

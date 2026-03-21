@@ -21,7 +21,7 @@ public class PortfolioProjectController {
     private final PortfolioProjectService portfolioProjectService;
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<PortfolioProjectResponse>> create(@Valid @RequestBody PortfolioProjectRequest request) {
         PortfolioProjectResponse response = portfolioProjectService.create(request);
 
@@ -35,7 +35,7 @@ public class PortfolioProjectController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<PortfolioProjectResponse>> update(
             @PathVariable Long id,
             @Valid @RequestBody PortfolioProjectRequest request
@@ -52,7 +52,7 @@ public class PortfolioProjectController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<PortfolioProjectResponse>> getById(@PathVariable Long id) {
         PortfolioProjectResponse response = portfolioProjectService.getById(id);
 
@@ -66,7 +66,7 @@ public class PortfolioProjectController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<PortfolioProjectResponse>>> getAll() {
         List<PortfolioProjectResponse> response = portfolioProjectService.getAll();
 
@@ -80,7 +80,7 @@ public class PortfolioProjectController {
     }
 
     @GetMapping("/active")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<PortfolioProjectResponse>>> getAllActive() {
         List<PortfolioProjectResponse> response = portfolioProjectService.getAllActive();
 
@@ -94,7 +94,7 @@ public class PortfolioProjectController {
     }
 
     @GetMapping("/section/{sectionId}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<PortfolioProjectResponse>>> getBySection(@PathVariable Long sectionId) {
         List<PortfolioProjectResponse> response = portfolioProjectService.getBySection(sectionId);
 
@@ -108,7 +108,7 @@ public class PortfolioProjectController {
     }
 
     @GetMapping("/section/{sectionId}/active")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<PortfolioProjectResponse>>> getActiveBySection(@PathVariable Long sectionId) {
         List<PortfolioProjectResponse> response = portfolioProjectService.getActiveBySection(sectionId);
 
@@ -122,7 +122,7 @@ public class PortfolioProjectController {
     }
 
     @GetMapping("/section/{sectionId}/featured")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<PortfolioProjectResponse>>> getFeaturedBySection(@PathVariable Long sectionId) {
         List<PortfolioProjectResponse> response = portfolioProjectService.getFeaturedBySection(sectionId);
 
@@ -136,7 +136,7 @@ public class PortfolioProjectController {
     }
 
     @GetMapping("/section/{sectionId}/featured/active")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<PortfolioProjectResponse>>> getActiveFeaturedBySection(@PathVariable Long sectionId) {
         List<PortfolioProjectResponse> response = portfolioProjectService.getActiveFeaturedBySection(sectionId);
 

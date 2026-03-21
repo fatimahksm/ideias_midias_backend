@@ -21,7 +21,7 @@ public class SectionItemController {
     private final SectionItemService sectionItemService;
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<SectionItemResponse>> create(@Valid @RequestBody SectionItemRequest request) {
         SectionItemResponse response = sectionItemService.create(request);
 
@@ -35,7 +35,7 @@ public class SectionItemController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<SectionItemResponse>> update(
             @PathVariable Long id,
             @Valid @RequestBody SectionItemRequest request
@@ -52,7 +52,7 @@ public class SectionItemController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<SectionItemResponse>> getById(@PathVariable Long id) {
         SectionItemResponse response = sectionItemService.getById(id);
 
@@ -66,7 +66,7 @@ public class SectionItemController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<SectionItemResponse>>> getAll() {
         List<SectionItemResponse> response = sectionItemService.getAll();
 
@@ -80,7 +80,7 @@ public class SectionItemController {
     }
 
     @GetMapping("/active")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<SectionItemResponse>>> getAllActive() {
         List<SectionItemResponse> response = sectionItemService.getAllActive();
 
@@ -94,7 +94,7 @@ public class SectionItemController {
     }
 
     @GetMapping("/section/{sectionId}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<SectionItemResponse>>> getBySection(@PathVariable Long sectionId) {
         List<SectionItemResponse> response = sectionItemService.getBySection(sectionId);
 
@@ -108,7 +108,7 @@ public class SectionItemController {
     }
 
     @GetMapping("/section/{sectionId}/active")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<SectionItemResponse>>> getActiveBySection(@PathVariable Long sectionId) {
         List<SectionItemResponse> response = sectionItemService.getActiveBySection(sectionId);
 
@@ -122,7 +122,7 @@ public class SectionItemController {
     }
 
     @GetMapping("/category/{categoryId}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<SectionItemResponse>>> getByCategory(@PathVariable Long categoryId) {
         List<SectionItemResponse> response = sectionItemService.getByCategory(categoryId);
 
@@ -136,7 +136,7 @@ public class SectionItemController {
     }
 
     @GetMapping("/category/{categoryId}/active")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<SectionItemResponse>>> getActiveByCategory(@PathVariable Long categoryId) {
         List<SectionItemResponse> response = sectionItemService.getActiveByCategory(categoryId);
 
@@ -150,7 +150,7 @@ public class SectionItemController {
     }
 
     @GetMapping("/section/{sectionId}/direct")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<SectionItemResponse>>> getDirectItemsBySection(@PathVariable Long sectionId) {
         List<SectionItemResponse> response = sectionItemService.getDirectItemsBySection(sectionId);
 
@@ -164,7 +164,7 @@ public class SectionItemController {
     }
 
     @GetMapping("/section/{sectionId}/direct/active")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<SectionItemResponse>>> getActiveDirectItemsBySection(@PathVariable Long sectionId) {
         List<SectionItemResponse> response = sectionItemService.getActiveDirectItemsBySection(sectionId);
 
@@ -178,7 +178,7 @@ public class SectionItemController {
     }
 
     @GetMapping("/section/{sectionId}/featured")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<SectionItemResponse>>> getFeaturedBySection(@PathVariable Long sectionId) {
         List<SectionItemResponse> response = sectionItemService.getFeaturedBySection(sectionId);
 
@@ -192,7 +192,7 @@ public class SectionItemController {
     }
 
     @GetMapping("/section/{sectionId}/featured/active")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<SectionItemResponse>>> getActiveFeaturedBySection(@PathVariable Long sectionId) {
         List<SectionItemResponse> response = sectionItemService.getActiveFeaturedBySection(sectionId);
 
