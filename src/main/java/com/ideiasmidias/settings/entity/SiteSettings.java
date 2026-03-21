@@ -14,6 +14,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.math.BigDecimal;
+
 @Getter
 @Setter
 @NoArgsConstructor
@@ -70,4 +72,10 @@ public class SiteSettings extends BaseEntity {
 
     @Column(name = "map_embed_url", columnDefinition = "TEXT")
     private String mapEmbedUrl;
+
+    @Column(name = "location_lat", precision = 10, scale = 7)
+    private BigDecimal locationLat;
+
+    @Column(name = "location_lng", precision = 10, scale = 7)
+    private BigDecimal locationLng;
 }

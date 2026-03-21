@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Getter
@@ -28,6 +29,8 @@ public class SiteSettingsResponse {
     private String addressPt;
     private String addressEn;
     private String mapEmbedUrl;
+    private BigDecimal locationLat;
+    private BigDecimal locationLng;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }
