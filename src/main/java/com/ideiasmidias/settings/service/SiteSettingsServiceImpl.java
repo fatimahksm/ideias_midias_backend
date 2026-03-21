@@ -50,6 +50,8 @@ public class SiteSettingsServiceImpl implements SiteSettingsService {
         siteSettings.setAddressPt(request.getAddressPt());
         siteSettings.setAddressEn(request.getAddressEn());
         siteSettings.setMapEmbedUrl(request.getMapEmbedUrl());
+        siteSettings.setLocationLat(request.getLocationLat());
+        siteSettings.setLocationLng(request.getLocationLng());
     }
 
     private SiteSettingsResponse mapToResponse(SiteSettings siteSettings) {
@@ -70,6 +72,8 @@ public class SiteSettingsServiceImpl implements SiteSettingsService {
                 .addressPt(siteSettings.getAddressPt())
                 .addressEn(siteSettings.getAddressEn())
                 .mapEmbedUrl(siteSettings.getMapEmbedUrl())
+                .locationLat(siteSettings.getLocationLat())
+                .locationLng(siteSettings.getLocationLng())
                 .createdAt(siteSettings.getCreatedAt())
                 .updatedAt(siteSettings.getUpdatedAt())
                 .build();

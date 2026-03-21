@@ -1,11 +1,15 @@
 package com.ideiasmidias.settings.dto;
 
 import com.ideiasmidias.common.enums.HeroBackgroundType;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
+
+import java.math.BigDecimal;
 
 @Getter
 @Setter
@@ -41,4 +45,12 @@ public class SiteSettingsRequest {
     private String addressPt;
     private String addressEn;
     private String mapEmbedUrl;
+
+    @DecimalMin(value = "-90.0", inclusive = true, message = "Latitude must be >= -90")
+    @DecimalMax(value = "90.0", inclusive = true, message = "Latitude must be <= 90")
+    private BigDecimal locationLat;
+
+    @DecimalMin(value = "-180.0", inclusive = true, message = "Longitude must be >= -180")
+    @DecimalMax(value = "180.0", inclusive = true, message = "Longitude must be <= 180")
+    private BigDecimal locationLng;
 }
