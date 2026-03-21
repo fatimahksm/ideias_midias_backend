@@ -52,7 +52,7 @@ public class HomeCardController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<HomeCardResponse>> getById(@PathVariable Long id) {
         HomeCardResponse response = homeCardService.getById(id);
 
@@ -66,7 +66,7 @@ public class HomeCardController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<HomeCardResponse>>> getAll() {
         List<HomeCardResponse> response = homeCardService.getAll();
 
@@ -80,7 +80,7 @@ public class HomeCardController {
     }
 
     @GetMapping("/active")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<HomeCardResponse>>> getAllActive() {
         List<HomeCardResponse> response = homeCardService.getAllActive();
 
@@ -94,7 +94,7 @@ public class HomeCardController {
     }
 
     @GetMapping("/section/{sectionId}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<HomeCardResponse>>> getBySection(@PathVariable Long sectionId) {
         List<HomeCardResponse> response = homeCardService.getBySection(sectionId);
 
@@ -108,7 +108,7 @@ public class HomeCardController {
     }
 
     @GetMapping("/section/{sectionId}/active")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<HomeCardResponse>>> getActiveBySection(@PathVariable Long sectionId) {
         List<HomeCardResponse> response = homeCardService.getActiveBySection(sectionId);
 

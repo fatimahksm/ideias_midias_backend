@@ -53,7 +53,7 @@ public class SectionController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<SectionResponse>> getById(@PathVariable Long id) {
         SectionResponse response = sectionService.getById(id);
 
@@ -67,7 +67,7 @@ public class SectionController {
     }
 
     @GetMapping("/slug/{slug}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<SectionResponse>> getBySlug(@PathVariable String slug) {
         SectionResponse response = sectionService.getBySlug(slug);
 
@@ -81,7 +81,7 @@ public class SectionController {
     }
 
     @GetMapping("/slug/{slug}/active")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<SectionResponse>> getActiveBySlug(@PathVariable String slug) {
         SectionResponse response = sectionService.getActiveBySlug(slug);
 
@@ -95,7 +95,7 @@ public class SectionController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<SectionResponse>>> getAll() {
         List<SectionResponse> response = sectionService.getAll();
 
@@ -109,7 +109,7 @@ public class SectionController {
     }
 
     @GetMapping("/active")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<SectionResponse>>> getAllActive() {
         List<SectionResponse> response = sectionService.getAllActive();
 
@@ -123,7 +123,7 @@ public class SectionController {
     }
 
     @GetMapping("/type/{sectionType}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<SectionResponse>>> getByType(@PathVariable SectionType sectionType) {
         List<SectionResponse> response = sectionService.getByType(sectionType);
 
@@ -137,7 +137,7 @@ public class SectionController {
     }
 
     @GetMapping("/type/{sectionType}/active")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<SectionResponse>>> getActiveByType(@PathVariable SectionType sectionType) {
         List<SectionResponse> response = sectionService.getActiveByType(sectionType);
 

@@ -52,7 +52,7 @@ public class SectionCategoryController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<SectionCategoryResponse>> getById(@PathVariable Long id) {
         SectionCategoryResponse response = sectionCategoryService.getById(id);
 
@@ -66,7 +66,7 @@ public class SectionCategoryController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<SectionCategoryResponse>>> getAll() {
         List<SectionCategoryResponse> response = sectionCategoryService.getAll();
 
@@ -80,7 +80,7 @@ public class SectionCategoryController {
     }
 
     @GetMapping("/active")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<SectionCategoryResponse>>> getAllActive() {
         List<SectionCategoryResponse> response = sectionCategoryService.getAllActive();
 
@@ -94,7 +94,7 @@ public class SectionCategoryController {
     }
 
     @GetMapping("/section/{sectionId}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<SectionCategoryResponse>>> getBySection(@PathVariable Long sectionId) {
         List<SectionCategoryResponse> response = sectionCategoryService.getBySection(sectionId);
 
@@ -108,7 +108,7 @@ public class SectionCategoryController {
     }
 
     @GetMapping("/section/{sectionId}/active")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<SectionCategoryResponse>>> getActiveBySection(@PathVariable Long sectionId) {
         List<SectionCategoryResponse> response = sectionCategoryService.getActiveBySection(sectionId);
 

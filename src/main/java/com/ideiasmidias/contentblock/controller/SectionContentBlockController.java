@@ -22,7 +22,7 @@ public class SectionContentBlockController {
     private final SectionContentBlockService sectionContentBlockService;
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<SectionContentBlockResponse>> create(@Valid @RequestBody SectionContentBlockRequest request) {
         SectionContentBlockResponse response = sectionContentBlockService.create(request);
 
@@ -36,7 +36,7 @@ public class SectionContentBlockController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<SectionContentBlockResponse>> update(
             @PathVariable Long id,
             @Valid @RequestBody SectionContentBlockRequest request
@@ -53,7 +53,7 @@ public class SectionContentBlockController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<SectionContentBlockResponse>> getById(@PathVariable Long id) {
         SectionContentBlockResponse response = sectionContentBlockService.getById(id);
 
@@ -67,7 +67,7 @@ public class SectionContentBlockController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<SectionContentBlockResponse>>> getAll() {
         List<SectionContentBlockResponse> response = sectionContentBlockService.getAll();
 
@@ -81,7 +81,7 @@ public class SectionContentBlockController {
     }
 
     @GetMapping("/active")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<SectionContentBlockResponse>>> getAllActive() {
         List<SectionContentBlockResponse> response = sectionContentBlockService.getAllActive();
 
@@ -95,7 +95,7 @@ public class SectionContentBlockController {
     }
 
     @GetMapping("/section/{sectionId}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<SectionContentBlockResponse>>> getBySection(@PathVariable Long sectionId) {
         List<SectionContentBlockResponse> response = sectionContentBlockService.getBySection(sectionId);
 
@@ -109,7 +109,7 @@ public class SectionContentBlockController {
     }
 
     @GetMapping("/section/{sectionId}/active")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<SectionContentBlockResponse>>> getActiveBySection(@PathVariable Long sectionId) {
         List<SectionContentBlockResponse> response = sectionContentBlockService.getActiveBySection(sectionId);
 
@@ -123,7 +123,7 @@ public class SectionContentBlockController {
     }
 
     @GetMapping("/section/{sectionId}/type/{blockType}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<SectionContentBlockResponse>>> getBySectionAndType(
             @PathVariable Long sectionId,
             @PathVariable ContentBlockType blockType
@@ -140,7 +140,7 @@ public class SectionContentBlockController {
     }
 
     @GetMapping("/section/{sectionId}/type/{blockType}/active")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<SectionContentBlockResponse>>> getActiveBySectionAndType(
             @PathVariable Long sectionId,
             @PathVariable ContentBlockType blockType

@@ -22,7 +22,7 @@ public class SectionItemMediaController {
     private final SectionItemMediaService sectionItemMediaService;
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<SectionItemMediaResponse>> create(@Valid @RequestBody SectionItemMediaRequest request) {
         SectionItemMediaResponse response = sectionItemMediaService.create(request);
 
@@ -36,7 +36,7 @@ public class SectionItemMediaController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<SectionItemMediaResponse>> update(
             @PathVariable Long id,
             @Valid @RequestBody SectionItemMediaRequest request
@@ -53,7 +53,7 @@ public class SectionItemMediaController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<SectionItemMediaResponse>> getById(@PathVariable Long id) {
         SectionItemMediaResponse response = sectionItemMediaService.getById(id);
 
@@ -67,7 +67,7 @@ public class SectionItemMediaController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<SectionItemMediaResponse>>> getAll() {
         List<SectionItemMediaResponse> response = sectionItemMediaService.getAll();
 
@@ -81,7 +81,7 @@ public class SectionItemMediaController {
     }
 
     @GetMapping("/active")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<SectionItemMediaResponse>>> getAllActive() {
         List<SectionItemMediaResponse> response = sectionItemMediaService.getAllActive();
 
@@ -95,7 +95,7 @@ public class SectionItemMediaController {
     }
 
     @GetMapping("/item/{itemId}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<SectionItemMediaResponse>>> getByItem(@PathVariable Long itemId) {
         List<SectionItemMediaResponse> response = sectionItemMediaService.getByItem(itemId);
 
@@ -109,7 +109,7 @@ public class SectionItemMediaController {
     }
 
     @GetMapping("/item/{itemId}/active")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<SectionItemMediaResponse>>> getActiveByItem(@PathVariable Long itemId) {
         List<SectionItemMediaResponse> response = sectionItemMediaService.getActiveByItem(itemId);
 
@@ -123,7 +123,7 @@ public class SectionItemMediaController {
     }
 
     @GetMapping("/item/{itemId}/type/{mediaType}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<SectionItemMediaResponse>>> getByItemAndType(
             @PathVariable Long itemId,
             @PathVariable MediaType mediaType
@@ -140,7 +140,7 @@ public class SectionItemMediaController {
     }
 
     @GetMapping("/item/{itemId}/type/{mediaType}/active")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<SectionItemMediaResponse>>> getActiveByItemAndType(
             @PathVariable Long itemId,
             @PathVariable MediaType mediaType

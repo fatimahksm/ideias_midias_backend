@@ -22,7 +22,7 @@ public class PortfolioProjectMediaController {
     private final PortfolioProjectMediaService portfolioProjectMediaService;
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<PortfolioProjectMediaResponse>> create(@Valid @RequestBody PortfolioProjectMediaRequest request) {
         PortfolioProjectMediaResponse response = portfolioProjectMediaService.create(request);
 
@@ -36,7 +36,7 @@ public class PortfolioProjectMediaController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<PortfolioProjectMediaResponse>> update(
             @PathVariable Long id,
             @Valid @RequestBody PortfolioProjectMediaRequest request
@@ -53,7 +53,7 @@ public class PortfolioProjectMediaController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<PortfolioProjectMediaResponse>> getById(@PathVariable Long id) {
         PortfolioProjectMediaResponse response = portfolioProjectMediaService.getById(id);
 
@@ -67,7 +67,7 @@ public class PortfolioProjectMediaController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<PortfolioProjectMediaResponse>>> getAll() {
         List<PortfolioProjectMediaResponse> response = portfolioProjectMediaService.getAll();
 
@@ -81,7 +81,7 @@ public class PortfolioProjectMediaController {
     }
 
     @GetMapping("/active")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<PortfolioProjectMediaResponse>>> getAllActive() {
         List<PortfolioProjectMediaResponse> response = portfolioProjectMediaService.getAllActive();
 
@@ -95,7 +95,7 @@ public class PortfolioProjectMediaController {
     }
 
     @GetMapping("/project/{projectId}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<PortfolioProjectMediaResponse>>> getByProject(@PathVariable Long projectId) {
         List<PortfolioProjectMediaResponse> response = portfolioProjectMediaService.getByProject(projectId);
 
@@ -109,7 +109,7 @@ public class PortfolioProjectMediaController {
     }
 
     @GetMapping("/project/{projectId}/active")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<PortfolioProjectMediaResponse>>> getActiveByProject(@PathVariable Long projectId) {
         List<PortfolioProjectMediaResponse> response = portfolioProjectMediaService.getActiveByProject(projectId);
 
@@ -123,7 +123,7 @@ public class PortfolioProjectMediaController {
     }
 
     @GetMapping("/project/{projectId}/type/{mediaType}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<PortfolioProjectMediaResponse>>> getByProjectAndType(
             @PathVariable Long projectId,
             @PathVariable MediaType mediaType
@@ -140,7 +140,7 @@ public class PortfolioProjectMediaController {
     }
 
     @GetMapping("/project/{projectId}/type/{mediaType}/active")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'EDITOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<PortfolioProjectMediaResponse>>> getActiveByProjectAndType(
             @PathVariable Long projectId,
             @PathVariable MediaType mediaType
