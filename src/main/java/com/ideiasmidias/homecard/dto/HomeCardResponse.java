@@ -18,6 +18,7 @@ public class HomeCardResponse {
     private String shortDescriptionPt;
     private String shortDescriptionEn;
     private String imageUrl;
+    private String sectionSlug;
     private String iconName;
     private Boolean isActive;
     private Integer sortOrder;

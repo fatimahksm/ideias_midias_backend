@@ -117,6 +117,7 @@ public class HomeCardServiceImpl implements HomeCardService {
         return HomeCardResponse.builder()
                 .id(homeCard.getId())
                 .sectionId(homeCard.getSection().getId())
+                .sectionSlug(homeCard.getSection().getSlug()) // ADD THIS
                 .titlePt(homeCard.getTitlePt())
                 .titleEn(homeCard.getTitleEn())
                 .shortDescriptionPt(homeCard.getShortDescriptionPt())
