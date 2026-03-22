@@ -56,6 +56,21 @@ public class PublicPortfolioProjectController {
         );
     }
 
+    @GetMapping("/projects/{projectId}")
+    public ResponseEntity<ApiResponse<PortfolioProjectResponse>> getActiveProjectById(
+            @PathVariable Long projectId
+    ) {
+        PortfolioProjectResponse response = getActivePortfolioProjectOrThrow(projectId);
+
+        return ResponseEntity.ok(
+                ApiResponse.<PortfolioProjectResponse>builder()
+                        .success(true)
+                        .message("Public active portfolio project fetched successfully")
+                        .data(response)
+                        .build()
+        );
+    }
+
     private SectionResponse getActivePortfolioSectionOrThrow(Long sectionId) {
         SectionResponse section = sectionService.getById(sectionId);
 
@@ -68,5 +83,25 @@ public class PublicPortfolioProjectController {
         }
 
         return section;
+    }
+
+    private PortfolioProjectResponse getActivePortfolioProjectOrThrow(Long projectId) {
+        PortfolioProjectResponse project = portfolioProjectService.getById(projectId);
+
+        if (!Boolean.TRUE.equals(project.getIsActive())) {
+            throw new ResourceNotFoundException("Active portfolio project not found with id: " + projectId);
+        }
+
+        SectionResponse section = sectionService.getById(project.getSectionId());
+
+        if (!Boolean.TRUE.equals(section.getIsActive())) {
+            throw new ResourceNotFoundException("Active portfolio section not found for project id: " + projectId);
+        }
+
+        if (section.getSectionType() != SectionType.PORTFOLIO) {
+            throw new BadRequestException("Project does not belong to a PORTFOLIO section");
+        }
+
+        return project;
     }
 }
