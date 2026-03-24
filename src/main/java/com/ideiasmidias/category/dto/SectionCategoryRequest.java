@@ -10,21 +10,22 @@ import lombok.Setter;
 @Setter
 public class SectionCategoryRequest {
 
-    @NotNull(message = "Section id is required")
+    @NotNull
     private Long sectionId;
 
-    @NotBlank(message = "Portuguese category name is required")
-    @Size(max = 255, message = "Portuguese category name must not exceed 255 characters")
+    @NotBlank
+    @Size(max = 255)
     private String namePt;
 
-    @NotBlank(message = "English category name is required")
-    @Size(max = 255, message = "English category name must not exceed 255 characters")
+    @NotBlank
+    @Size(max = 255)
     private String nameEn;
 
     private String descriptionPt;
-    private String descriptionEn;
-    private String imageUrl;
 
-    private Boolean isActive = true;
-    private Integer sortOrder = 0;
+    private String descriptionEn;
+
+    private Boolean isActive;
+
+    private Integer sortOrder;
 }

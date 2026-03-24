@@ -17,7 +17,6 @@ public class SectionCategoryResponse {
     private String nameEn;
     private String descriptionPt;
     private String descriptionEn;
-    private String imageUrl;
     private Boolean isActive;
     private Integer sortOrder;
     private LocalDateTime createdAt;

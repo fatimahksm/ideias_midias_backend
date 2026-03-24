@@ -122,7 +122,6 @@ public class SectionCategoryServiceImpl implements SectionCategoryService {
         category.setNameEn(request.getNameEn());
         category.setDescriptionPt(request.getDescriptionPt());
         category.setDescriptionEn(request.getDescriptionEn());
-        category.setImageUrl(request.getImageUrl());
         category.setIsActive(request.getIsActive() != null ? request.getIsActive() : true);
         category.setSortOrder(request.getSortOrder() != null ? request.getSortOrder() : 0);
     }
@@ -135,7 +134,6 @@ public class SectionCategoryServiceImpl implements SectionCategoryService {
                 .nameEn(category.getNameEn())
                 .descriptionPt(category.getDescriptionPt())
                 .descriptionEn(category.getDescriptionEn())
-                .imageUrl(category.getImageUrl())
                 .isActive(category.getIsActive())
                 .sortOrder(category.getSortOrder())
                 .createdAt(category.getCreatedAt())
