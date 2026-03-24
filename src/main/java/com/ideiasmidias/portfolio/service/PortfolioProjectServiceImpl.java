@@ -6,6 +6,7 @@ import com.ideiasmidias.common.exception.ResourceNotFoundException;
 import com.ideiasmidias.portfolio.dto.PortfolioProjectRequest;
 import com.ideiasmidias.portfolio.dto.PortfolioProjectResponse;
 import com.ideiasmidias.portfolio.entity.PortfolioProject;
+import com.ideiasmidias.portfolio.repository.PortfolioProjectMediaRepository;
 import com.ideiasmidias.portfolio.repository.PortfolioProjectRepository;
 import com.ideiasmidias.section.entity.Section;
 import com.ideiasmidias.section.repository.SectionRepository;
@@ -22,6 +23,7 @@ public class PortfolioProjectServiceImpl implements PortfolioProjectService {
 
     private final PortfolioProjectRepository portfolioProjectRepository;
     private final SectionRepository sectionRepository;
+    private final PortfolioProjectMediaRepository portfolioProjectMediaRepository;
 
     @Override
     public PortfolioProjectResponse create(PortfolioProjectRequest request) {
@@ -108,6 +110,11 @@ public class PortfolioProjectServiceImpl implements PortfolioProjectService {
     @Override
     public void delete(Long id) {
         PortfolioProject project = getEntityById(id);
+
+        if (portfolioProjectMediaRepository.countByProject_Id(id) > 0) {
+            throw new BadRequestException("Cannot delete portfolio project while it still has related media. Delete the media first.");
+        }
+
         portfolioProjectRepository.delete(project);
     }
 
@@ -141,6 +148,7 @@ public class PortfolioProjectServiceImpl implements PortfolioProjectService {
         project.setLocationEn(request.getLocationEn());
         project.setCoverImageUrl(request.getCoverImageUrl());
         project.setVideoUrl(request.getVideoUrl());
+        project.setAttributesJson(request.getAttributesJson());
         project.setIsFeatured(request.getIsFeatured() != null ? request.getIsFeatured() : false);
         project.setIsActive(request.getIsActive() != null ? request.getIsActive() : true);
         project.setSortOrder(request.getSortOrder() != null ? request.getSortOrder() : 0);
@@ -162,6 +170,7 @@ public class PortfolioProjectServiceImpl implements PortfolioProjectService {
                 .locationEn(project.getLocationEn())
                 .coverImageUrl(project.getCoverImageUrl())
                 .videoUrl(project.getVideoUrl())
+                .attributesJson(project.getAttributesJson())
                 .isFeatured(project.getIsFeatured())
                 .isActive(project.getIsActive())
                 .sortOrder(project.getSortOrder())

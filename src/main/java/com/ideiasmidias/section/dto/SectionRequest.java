@@ -31,6 +31,15 @@ public class SectionRequest {
 
     private String coverImageUrl;
     private String coverVideoUrl;
+    private String displayVariant;
+    private String layoutStyle;
+    private Boolean showIntro = true;
+    private Boolean showGallery = false;
+    private Boolean showFilters = false;
+    private Boolean showItemDetails = true;
+    private String detailsViewMode;
+    private Boolean allowCustomAttributes = true;
+    private String settingsJson;
 
     private Boolean isActive = true;
     private Integer sortOrder = 0;

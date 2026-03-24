@@ -7,6 +7,8 @@ import java.util.List;
 
 public interface PortfolioProjectRepository extends JpaRepository<PortfolioProject, Long> {
 
+    long countBySection_Id(Long sectionId);
+
     List<PortfolioProject> findAllByOrderBySortOrderAscIdAsc();
 
     List<PortfolioProject> findAllByIsActiveTrueOrderBySortOrderAscIdAsc();

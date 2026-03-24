@@ -41,7 +41,7 @@ public class PortfolioProjectRequest {
 
     private String coverImageUrl;
     private String videoUrl;
-
+    private String attributesJson;
     private Boolean isFeatured = false;
     private Boolean isActive = true;
     private Integer sortOrder = 0;

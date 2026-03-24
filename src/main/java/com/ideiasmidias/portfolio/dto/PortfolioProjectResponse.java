@@ -26,6 +26,7 @@ public class PortfolioProjectResponse {
     private String locationEn;
     private String coverImageUrl;
     private String videoUrl;
+    private String attributesJson;
     private Boolean isFeatured;
     private Boolean isActive;
     private Integer sortOrder;

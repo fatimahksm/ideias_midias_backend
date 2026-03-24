@@ -7,6 +7,7 @@ import com.ideiasmidias.category.repository.SectionCategoryRepository;
 import com.ideiasmidias.common.enums.SectionType;
 import com.ideiasmidias.common.exception.BadRequestException;
 import com.ideiasmidias.common.exception.ResourceNotFoundException;
+import com.ideiasmidias.item.repository.SectionItemRepository;
 import com.ideiasmidias.section.entity.Section;
 import com.ideiasmidias.section.repository.SectionRepository;
 import jakarta.transaction.Transactional;
@@ -22,6 +23,7 @@ public class SectionCategoryServiceImpl implements SectionCategoryService {
 
     private final SectionCategoryRepository sectionCategoryRepository;
     private final SectionRepository sectionRepository;
+    private final SectionItemRepository sectionItemRepository;
 
     @Override
     public SectionCategoryResponse create(SectionCategoryRequest request) {
@@ -90,6 +92,11 @@ public class SectionCategoryServiceImpl implements SectionCategoryService {
     @Override
     public void delete(Long id) {
         SectionCategory category = getEntityById(id);
+
+        if (sectionItemRepository.countByCategory_Id(id) > 0) {
+            throw new BadRequestException("Cannot delete category while it still has related items. Delete the items first.");
+        }
+
         sectionCategoryRepository.delete(category);
     }
 

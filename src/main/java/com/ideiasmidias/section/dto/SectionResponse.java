@@ -21,6 +21,15 @@ public class SectionResponse {
     private SectionType sectionType;
     private String coverImageUrl;
     private String coverVideoUrl;
+    private String displayVariant;
+    private String layoutStyle;
+    private Boolean showIntro;
+    private Boolean showGallery;
+    private Boolean showFilters;
+    private Boolean showItemDetails;
+    private String detailsViewMode;
+    private Boolean allowCustomAttributes;
+    private String settingsJson;
     private Boolean isActive;
     private Integer sortOrder;
     private LocalDateTime createdAt;

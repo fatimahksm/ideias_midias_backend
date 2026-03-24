@@ -8,6 +8,8 @@ import java.util.List;
 
 public interface SectionItemMediaRepository extends JpaRepository<SectionItemMedia, Long> {
 
+    long countByItem_Id(Long itemId);
+
     List<SectionItemMedia> findAllByOrderBySortOrderAscIdAsc();
 
     List<SectionItemMedia> findAllByIsActiveTrueOrderBySortOrderAscIdAsc();

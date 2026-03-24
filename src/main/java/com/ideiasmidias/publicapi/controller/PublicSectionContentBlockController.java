@@ -1,7 +1,5 @@
 package com.ideiasmidias.publicapi.controller;
 
-import com.ideiasmidias.common.enums.SectionType;
-import com.ideiasmidias.common.exception.BadRequestException;
 import com.ideiasmidias.common.exception.ResourceNotFoundException;
 import com.ideiasmidias.common.response.ApiResponse;
 import com.ideiasmidias.contentblock.dto.SectionContentBlockResponse;
@@ -26,11 +24,7 @@ public class PublicSectionContentBlockController {
     public ResponseEntity<ApiResponse<List<SectionContentBlockResponse>>> getActiveContentBlocksBySection(
             @PathVariable Long sectionId
     ) {
-        SectionResponse section = getActiveSectionOrThrow(sectionId);
-
-        if (section.getSectionType() != SectionType.CONTENT) {
-            throw new BadRequestException("Content blocks are only available for sections of type CONTENT");
-        }
+        getActiveSectionOrThrow(sectionId);
 
         List<SectionContentBlockResponse> response = sectionContentBlockService.getActiveBySection(sectionId);
 

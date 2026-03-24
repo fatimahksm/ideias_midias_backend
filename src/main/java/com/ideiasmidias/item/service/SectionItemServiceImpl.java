@@ -8,9 +8,13 @@ import com.ideiasmidias.common.exception.ResourceNotFoundException;
 import com.ideiasmidias.item.dto.SectionItemRequest;
 import com.ideiasmidias.item.dto.SectionItemResponse;
 import com.ideiasmidias.item.entity.SectionItem;
+import com.ideiasmidias.item.repository.SectionItemMediaRepository;
 import com.ideiasmidias.item.repository.SectionItemRepository;
 import com.ideiasmidias.section.entity.Section;
 import com.ideiasmidias.section.repository.SectionRepository;
+import com.ideiasmidias.sectionattribute.entity.SectionItemAttributeValue;
+import com.ideiasmidias.sectionattribute.repository.SectionItemAttributeValueRepository;
+import com.ideiasmidias.sectionattribute.service.SectionAttributeDefinitionService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -25,6 +29,9 @@ public class SectionItemServiceImpl implements SectionItemService {
     private final SectionItemRepository sectionItemRepository;
     private final SectionRepository sectionRepository;
     private final SectionCategoryRepository sectionCategoryRepository;
+    private final SectionItemMediaRepository sectionItemMediaRepository;
+    private final SectionItemAttributeValueRepository sectionItemAttributeValueRepository;
+    private final SectionAttributeDefinitionService sectionAttributeDefinitionService;
 
     @Override
     public SectionItemResponse create(SectionItemRequest request) {
@@ -35,6 +42,11 @@ public class SectionItemServiceImpl implements SectionItemService {
         applyRequestToEntity(item, request, section, category);
 
         SectionItem saved = sectionItemRepository.save(item);
+        sectionAttributeDefinitionService.replaceValuesForItem(
+                section.getId(),
+                saved.getId(),
+                request.getAttributeValues()
+        );
         return mapToResponse(saved);
     }
 
@@ -47,6 +59,11 @@ public class SectionItemServiceImpl implements SectionItemService {
         applyRequestToEntity(item, request, section, category);
 
         SectionItem saved = sectionItemRepository.save(item);
+        sectionAttributeDefinitionService.replaceValuesForItem(
+                section.getId(),
+                saved.getId(),
+                request.getAttributeValues()
+        );
         return mapToResponse(saved);
     }
 
@@ -149,6 +166,14 @@ public class SectionItemServiceImpl implements SectionItemService {
     @Override
     public void delete(Long id) {
         SectionItem item = getEntityById(id);
+
+        if (sectionItemMediaRepository.countByItem_Id(id) > 0) {
+            throw new BadRequestException("Cannot delete item while it still has related media. Delete the media first.");
+        }
+        if (sectionItemAttributeValueRepository.countBySectionItem_Id(id) > 0) {
+            sectionItemAttributeValueRepository.deleteAllBySectionItem_Id(id);
+        }
+
         sectionItemRepository.delete(item);
     }
 
@@ -209,6 +234,7 @@ public class SectionItemServiceImpl implements SectionItemService {
         item.setItemType(request.getItemType());
         item.setSpecificationsPt(request.getSpecificationsPt());
         item.setSpecificationsEn(request.getSpecificationsEn());
+        item.setAttributesJson(request.getAttributesJson());
         item.setIsFeatured(request.getIsFeatured() != null ? request.getIsFeatured() : false);
         item.setIsActive(request.getIsActive() != null ? request.getIsActive() : true);
         item.setSortOrder(request.getSortOrder() != null ? request.getSortOrder() : 0);
@@ -230,11 +256,18 @@ public class SectionItemServiceImpl implements SectionItemService {
                 .itemType(item.getItemType())
                 .specificationsPt(item.getSpecificationsPt())
                 .specificationsEn(item.getSpecificationsEn())
+                .attributesJson(item.getAttributesJson())
+                .attributeValues(mapAttributeValues(item.getId()))
                 .isFeatured(item.getIsFeatured())
                 .isActive(item.getIsActive())
                 .sortOrder(item.getSortOrder())
                 .createdAt(item.getCreatedAt())
                 .updatedAt(item.getUpdatedAt())
                 .build();
+    }
+
+    private List<com.ideiasmidias.sectionattribute.dto.SectionItemAttributeValueResponse> mapAttributeValues(Long itemId) {
+        List<SectionItemAttributeValue> values = sectionItemAttributeValueRepository.findAllBySectionItem_Id(itemId);
+        return sectionAttributeDefinitionService.toValueResponses(values);
     }
 }

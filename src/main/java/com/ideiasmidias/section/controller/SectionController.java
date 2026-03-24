@@ -2,8 +2,10 @@ package com.ideiasmidias.section.controller;
 
 import com.ideiasmidias.common.enums.SectionType;
 import com.ideiasmidias.common.response.ApiResponse;
+import com.ideiasmidias.section.dto.SectionDetailsResponse;
 import com.ideiasmidias.section.dto.SectionRequest;
 import com.ideiasmidias.section.dto.SectionResponse;
+import com.ideiasmidias.section.service.SectionDetailsService;
 import com.ideiasmidias.section.service.SectionService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +22,7 @@ import java.util.List;
 public class SectionController {
 
     private final SectionService sectionService;
+    private final SectionDetailsService sectionDetailsService;
 
     @PostMapping
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
@@ -61,6 +64,20 @@ public class SectionController {
                 ApiResponse.<SectionResponse>builder()
                         .success(true)
                         .message("Section fetched successfully")
+                        .data(response)
+                        .build()
+        );
+    }
+
+    @GetMapping("/{id}/details")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    public ResponseEntity<ApiResponse<SectionDetailsResponse>> getDetailsById(@PathVariable Long id) {
+        SectionDetailsResponse response = sectionDetailsService.getAdminDetailsById(id);
+
+        return ResponseEntity.ok(
+                ApiResponse.<SectionDetailsResponse>builder()
+                        .success(true)
+                        .message("Section details fetched successfully")
                         .data(response)
                         .build()
         );

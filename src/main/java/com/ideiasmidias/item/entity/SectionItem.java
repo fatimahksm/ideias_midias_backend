@@ -68,6 +68,9 @@ public class SectionItem extends BaseActiveSortableEntity {
     @Column(name = "specifications_en", columnDefinition = "TEXT")
     private String specificationsEn;
 
+    @Column(name = "attributes_json", columnDefinition = "TEXT")
+    private String attributesJson;
+
     @Column(name = "is_featured", nullable = false)
     private Boolean isFeatured = false;
 }
