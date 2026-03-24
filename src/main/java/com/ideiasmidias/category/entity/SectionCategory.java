@@ -41,7 +41,4 @@ public class SectionCategory extends BaseActiveSortableEntity {
 
     @Column(name = "description_en", columnDefinition = "TEXT")
     private String descriptionEn;
-
-    @Column(name = "image_url", columnDefinition = "TEXT")
-    private String imageUrl;
 }
