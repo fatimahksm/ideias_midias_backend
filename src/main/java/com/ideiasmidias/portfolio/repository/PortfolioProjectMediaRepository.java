@@ -8,6 +8,8 @@ import java.util.List;
 
 public interface PortfolioProjectMediaRepository extends JpaRepository<PortfolioProjectMedia, Long> {
 
+    long countByProject_Id(Long projectId);
+
     List<PortfolioProjectMedia> findAllByOrderBySortOrderAscIdAsc();
 
     List<PortfolioProjectMedia> findAllByIsActiveTrueOrderBySortOrderAscIdAsc();

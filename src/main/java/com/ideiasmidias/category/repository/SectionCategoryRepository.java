@@ -7,6 +7,8 @@ import java.util.List;
 
 public interface SectionCategoryRepository extends JpaRepository<SectionCategory, Long> {
 
+    long countBySection_Id(Long sectionId);
+
     List<SectionCategory> findAllByOrderBySortOrderAscIdAsc();
 
     List<SectionCategory> findAllByIsActiveTrueOrderBySortOrderAscIdAsc();

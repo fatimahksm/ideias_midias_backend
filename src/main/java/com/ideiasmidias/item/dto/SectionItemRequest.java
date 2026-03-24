@@ -5,6 +5,9 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
+import com.ideiasmidias.sectionattribute.dto.SectionItemAttributeValueRequest;
+
+import java.util.List;
 
 @Getter
 @Setter
@@ -35,7 +38,8 @@ public class SectionItemRequest {
 
     private String specificationsPt;
     private String specificationsEn;
-
+    private String attributesJson;
+    private List<SectionItemAttributeValueRequest> attributeValues;
     private Boolean isFeatured = false;
     private Boolean isActive = true;
     private Integer sortOrder = 0;

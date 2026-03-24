@@ -49,4 +49,31 @@ public class Section extends BaseActiveSortableEntity {
 
     @Column(name = "cover_video_url", columnDefinition = "TEXT")
     private String coverVideoUrl;
+
+    @Column(name = "display_variant", length = 100)
+    private String displayVariant;
+
+    @Column(name = "layout_style", length = 100)
+    private String layoutStyle;
+
+    @Column(name = "show_intro", nullable = false)
+    private Boolean showIntro = true;
+
+    @Column(name = "show_gallery", nullable = false)
+    private Boolean showGallery = false;
+
+    @Column(name = "show_filters", nullable = false)
+    private Boolean showFilters = false;
+
+    @Column(name = "show_item_details", nullable = false)
+    private Boolean showItemDetails = true;
+
+    @Column(name = "details_view_mode", length = 100)
+    private String detailsViewMode;
+
+    @Column(name = "allow_custom_attributes", nullable = false)
+    private Boolean allowCustomAttributes = true;
+
+    @Column(name = "settings_json", columnDefinition = "TEXT")
+    private String settingsJson;
 }

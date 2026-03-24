@@ -8,6 +8,8 @@ import java.util.List;
 
 public interface SectionContentBlockRepository extends JpaRepository<SectionContentBlock, Long> {
 
+    long countBySection_Id(Long sectionId);
+
     List<SectionContentBlock> findAllByOrderBySortOrderAscIdAsc();
 
     List<SectionContentBlock> findAllByIsActiveTrueOrderBySortOrderAscIdAsc();

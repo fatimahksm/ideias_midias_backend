@@ -26,7 +26,7 @@ public class SectionContentBlockServiceImpl implements SectionContentBlockServic
 
     @Override
     public SectionContentBlockResponse create(SectionContentBlockRequest request) {
-        Section section = getValidContentSection(request.getSectionId());
+        Section section = getSection(request.getSectionId());
 
         SectionContentBlock block = new SectionContentBlock();
         applyRequestToEntity(block, request, section);
@@ -38,7 +38,7 @@ public class SectionContentBlockServiceImpl implements SectionContentBlockServic
     @Override
     public SectionContentBlockResponse update(Long id, SectionContentBlockRequest request) {
         SectionContentBlock block = getEntityById(id);
-        Section section = getValidContentSection(request.getSectionId());
+        Section section = getSection(request.getSectionId());
 
         applyRequestToEntity(block, request, section);
 
@@ -117,18 +117,13 @@ public class SectionContentBlockServiceImpl implements SectionContentBlockServic
                 .orElseThrow(() -> new ResourceNotFoundException("Section content block not found with id: " + id));
     }
 
-    private Section getValidContentSection(Long sectionId) {
-        Section section = sectionRepository.findById(sectionId)
+    private Section getSection(Long sectionId) {
+        return sectionRepository.findById(sectionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Section not found with id: " + sectionId));
-
-        if (section.getSectionType() != SectionType.CONTENT) {
-            throw new BadRequestException("Content blocks can only be added to sections of type CONTENT");
-        }
-
-        return section;
     }
 
     private void applyRequestToEntity(SectionContentBlock block, SectionContentBlockRequest request, Section section) {
+        validateBlockCompatibility(section.getSectionType(), request.getBlockType());
         block.setSection(section);
         block.setBlockType(request.getBlockType());
         block.setTitlePt(request.getTitlePt());
@@ -141,6 +136,18 @@ public class SectionContentBlockServiceImpl implements SectionContentBlockServic
         block.setVideoUrl(request.getVideoUrl());
         block.setIsActive(request.getIsActive() != null ? request.getIsActive() : true);
         block.setSortOrder(request.getSortOrder() != null ? request.getSortOrder() : 0);
+    }
+
+    private void validateBlockCompatibility(SectionType sectionType, ContentBlockType blockType) {
+        if (sectionType == null || blockType == null) {
+            throw new BadRequestException("Section type and block type are required");
+        }
+        if (sectionType != SectionType.CONTENT
+                && sectionType != SectionType.DIRECT_ITEMS
+                && sectionType != SectionType.CATEGORY_ITEMS
+                && sectionType != SectionType.PORTFOLIO) {
+            throw new BadRequestException("Unsupported section type for content blocks: " + sectionType);
+        }
     }
 
     private SectionContentBlockResponse mapToResponse(SectionContentBlock block) {

@@ -68,6 +68,9 @@ public class PortfolioProject extends BaseActiveSortableEntity {
     @Column(name = "video_url", columnDefinition = "TEXT")
     private String videoUrl;
 
+    @Column(name = "attributes_json", columnDefinition = "TEXT")
+    private String attributesJson;
+
     @Column(name = "is_featured", nullable = false)
     private Boolean isFeatured = false;
 }
