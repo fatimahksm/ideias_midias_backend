@@ -7,13 +7,24 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
-import org.springframework.stereotype.Component;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Component;
+
+import java.util.Locale;
+import java.util.Set;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class AdminBootstrapSeeder implements CommandLineRunner {
+
+    private static final Set<String> DISALLOWED_PASSWORD_VALUES = Set.of(
+            "CHANGE_ME",
+            "Admin@123456",
+            "admin123456",
+            "password",
+            "123456"
+    );
 
     private final AdminUserRepository adminUserRepository;
     private final PasswordEncoder passwordEncoder;
@@ -24,10 +35,10 @@ public class AdminBootstrapSeeder implements CommandLineRunner {
     @Value("${app.bootstrap.admin.full-name:Super Admin}")
     private String fullName;
 
-    @Value("${app.bootstrap.admin.email:admin@ideiasmidias.com}")
+    @Value("${app.bootstrap.admin.email:}")
     private String email;
 
-    @Value("${app.bootstrap.admin.password:Admin@123456}")
+    @Value("${app.bootstrap.admin.password:}")
     private String rawPassword;
 
     @Override
@@ -37,32 +48,60 @@ public class AdminBootstrapSeeder implements CommandLineRunner {
             return;
         }
 
-        String normalizedEmail = email == null ? null : email.trim().toLowerCase();
+        String normalizedEmail = normalizeEmail(email);
+        String normalizedPassword = normalizePassword(rawPassword);
+        String normalizedFullName = normalizeFullName(fullName);
 
         if (normalizedEmail == null || normalizedEmail.isBlank()) {
-            log.warn("Bootstrap admin email is blank. Seeder skipped.");
+            log.warn("Bootstrap admin seeding skipped: email is blank.");
             return;
         }
 
-        if (rawPassword == null || rawPassword.isBlank()) {
-            log.warn("Bootstrap admin password is blank. Seeder skipped.");
+        if (normalizedPassword == null || normalizedPassword.isBlank()) {
+            log.warn("Bootstrap admin seeding skipped: password is blank.");
             return;
         }
 
-        if (adminUserRepository.existsByEmail(normalizedEmail)) {
+        if (isDisallowedPassword(normalizedPassword)) {
+            log.warn("Bootstrap admin seeding skipped: unsafe default/bootstrap password detected.");
+            return;
+        }
+
+        if (adminUserRepository.existsByEmailIgnoreCase(normalizedEmail)) {
             log.info("Bootstrap admin already exists: {}", normalizedEmail);
             return;
         }
 
         AdminUser adminUser = new AdminUser();
-        adminUser.setFullName(fullName != null && !fullName.isBlank() ? fullName.trim() : "Super Admin");
+        adminUser.setFullName(normalizedFullName);
         adminUser.setEmail(normalizedEmail);
-        adminUser.setPasswordHash(passwordEncoder.encode(rawPassword));
+        adminUser.setPasswordHash(passwordEncoder.encode(normalizedPassword));
         adminUser.setRole(AdminRole.SUPER_ADMIN);
         adminUser.setIsActive(true);
 
         adminUserRepository.save(adminUser);
 
         log.info("Bootstrap SUPER_ADMIN created successfully with email: {}", normalizedEmail);
+    }
+
+    private String normalizeEmail(String value) {
+        return value == null ? null : value.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private String normalizePassword(String value) {
+        return value == null ? null : value.trim();
+    }
+
+    private String normalizeFullName(String value) {
+        if (value == null || value.isBlank()) {
+            return "Super Admin";
+        }
+
+        return value.trim();
+    }
+
+    private boolean isDisallowedPassword(String password) {
+        return DISALLOWED_PASSWORD_VALUES.stream()
+                .anyMatch(disallowed -> disallowed.equalsIgnoreCase(password));
     }
 }

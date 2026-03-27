@@ -3,17 +3,20 @@ package com.ideiasmidias.media.service;
 import com.ideiasmidias.adminuser.entity.AdminUser;
 import com.ideiasmidias.adminuser.repository.AdminUserRepository;
 import com.ideiasmidias.common.enums.MediaType;
+import com.ideiasmidias.common.exception.BadRequestException;
 import com.ideiasmidias.common.exception.ResourceNotFoundException;
 import com.ideiasmidias.media.dto.MediaLibraryResponse;
 import com.ideiasmidias.media.entity.MediaLibrary;
 import com.ideiasmidias.media.repository.MediaLibraryRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -25,6 +28,10 @@ public class MediaLibraryServiceImpl implements MediaLibraryService {
 
     @Override
     public MediaLibraryResponse upload(MultipartFile file, Long uploadedById) {
+        if (uploadedById == null) {
+            throw new BadRequestException("Uploader admin id is required");
+        }
+
         AdminUser uploadedBy = adminUserRepository.findById(uploadedById)
                 .orElseThrow(() -> new ResourceNotFoundException("Admin user not found with id: " + uploadedById));
 
@@ -40,9 +47,39 @@ public class MediaLibraryServiceImpl implements MediaLibraryService {
         media.setUploadedBy(uploadedBy);
 
         try {
-            return mapToResponse(mediaLibraryRepository.save(media));
+            MediaLibrary saved = mediaLibraryRepository.save(media);
+
+            log.info(
+                    "Media uploaded successfully. mediaId={}, uploadedById={}, fileType={}, fileUrl={}",
+                    saved.getId(),
+                    uploadedById,
+                    saved.getFileType(),
+                    saved.getFileUrl()
+            );
+
+            return mapToResponse(saved);
         } catch (RuntimeException ex) {
-            mediaStorageService.deleteByFileUrl(storedFile.fileUrl());
+            log.error(
+                    "Media database save failed after file storage. uploadedById={}, fileUrl={}, errorType={}, message={}",
+                    uploadedById,
+                    storedFile.fileUrl(),
+                    ex.getClass().getSimpleName(),
+                    ex.getMessage(),
+                    ex
+            );
+
+            try {
+                mediaStorageService.deleteByFileUrl(storedFile.fileUrl());
+            } catch (RuntimeException cleanupEx) {
+                log.error(
+                        "Stored media cleanup failed after save error. fileUrl={}, errorType={}, message={}",
+                        storedFile.fileUrl(),
+                        cleanupEx.getClass().getSimpleName(),
+                        cleanupEx.getMessage(),
+                        cleanupEx
+                );
+            }
+
             throw ex;
         }
     }
@@ -92,8 +129,28 @@ public class MediaLibraryServiceImpl implements MediaLibraryService {
     @Override
     public void delete(Long id) {
         MediaLibrary media = getEntityById(id);
-        mediaStorageService.deleteByFileUrl(media.getFileUrl());
+        String fileUrl = media.getFileUrl();
+
         mediaLibraryRepository.delete(media);
+
+        log.info(
+                "Media library record deleted. mediaId={}, fileUrl={}",
+                id,
+                fileUrl
+        );
+
+        try {
+            mediaStorageService.deleteByFileUrl(fileUrl);
+        } catch (RuntimeException ex) {
+            log.error(
+                    "Media file cleanup failed after record deletion. mediaId={}, fileUrl={}, errorType={}, message={}",
+                    id,
+                    fileUrl,
+                    ex.getClass().getSimpleName(),
+                    ex.getMessage(),
+                    ex
+            );
+        }
     }
 
     private MediaLibrary getEntityById(Long id) {
