@@ -7,12 +7,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -32,6 +35,16 @@ public class MediaStorageServiceImpl implements MediaStorageService {
             "video/quicktime"
     );
 
+    private static final Map<String, Set<String>> ALLOWED_EXTENSIONS_BY_MIME = Map.of(
+            "image/jpeg", Set.of(".jpg", ".jpeg"),
+            "image/png", Set.of(".png"),
+            "image/webp", Set.of(".webp"),
+            "image/gif", Set.of(".gif"),
+            "video/mp4", Set.of(".mp4", ".m4v"),
+            "video/webm", Set.of(".webm"),
+            "video/quicktime", Set.of(".mov", ".qt")
+    );
+
     @Value("${app.media.upload-dir:uploads/media}")
     private String uploadDir;
 
@@ -43,10 +56,11 @@ public class MediaStorageServiceImpl implements MediaStorageService {
 
     @Override
     public StoredMediaFile store(MultipartFile file) {
-        validateFile(file);
-
         String originalName = sanitizeOriginalName(file.getOriginalFilename());
         String mimeType = normalizeMimeType(file.getContentType());
+
+        validateFile(file, originalName, mimeType);
+
         MediaType mediaType = resolveMediaType(mimeType);
         String extension = resolveExtension(originalName, mimeType);
         String storedFileName = UUID.randomUUID() + extension;
@@ -116,17 +130,25 @@ public class MediaStorageServiceImpl implements MediaStorageService {
         }
     }
 
-    private void validateFile(MultipartFile file) {
+    private void validateFile(MultipartFile file, String originalName, String mimeType) {
         if (file == null || file.isEmpty()) {
             throw new BadRequestException("File is required");
+        }
+
+        if (file.getSize() <= 0) {
+            throw new BadRequestException("File is empty");
         }
 
         if (file.getSize() > maxFileSizeBytes) {
             throw new BadRequestException("File size exceeds the allowed limit");
         }
 
-        String mimeType = normalizeMimeType(file.getContentType());
-        resolveMediaType(mimeType);
+        MediaType mediaType = resolveMediaType(mimeType);
+
+        validateExtensionAgainstMime(originalName, mimeType);
+
+        byte[] header = readHeader(file, 32);
+        validateSignature(header, mimeType, mediaType);
     }
 
     private MediaType resolveMediaType(String mimeType) {
@@ -138,16 +160,32 @@ public class MediaStorageServiceImpl implements MediaStorageService {
             return MediaType.VIDEO;
         }
 
-        throw new BadRequestException("Unsupported file type. Only image and video uploads are allowed");
+        throw new BadRequestException("Unsupported file type. Only approved image and video uploads are allowed");
+    }
+
+    private void validateExtensionAgainstMime(String originalName, String mimeType) {
+        String extension = extractExtension(originalName);
+
+        if (extension == null) {
+            return;
+        }
+
+        Set<String> allowedExtensions = ALLOWED_EXTENSIONS_BY_MIME.get(mimeType);
+        if (allowedExtensions == null || !allowedExtensions.contains(extension)) {
+            throw new BadRequestException("File extension does not match the provided content type");
+        }
     }
 
     private String resolveExtension(String originalName, String mimeType) {
-        int lastDot = originalName.lastIndexOf('.');
-        if (lastDot >= 0 && lastDot < originalName.length() - 1) {
-            String ext = originalName.substring(lastDot).toLowerCase(Locale.ROOT);
-            if (ext.matches("\\.[a-z0-9]{1,10}")) {
-                return ext;
+        String extension = extractExtension(originalName);
+
+        if (extension != null) {
+            Set<String> allowedExtensions = ALLOWED_EXTENSIONS_BY_MIME.get(mimeType);
+            if (allowedExtensions != null && allowedExtensions.contains(extension)) {
+                return extension;
             }
+
+            throw new BadRequestException("File extension does not match the provided content type");
         }
 
         return switch (mimeType) {
@@ -158,8 +196,127 @@ public class MediaStorageServiceImpl implements MediaStorageService {
             case "video/mp4" -> ".mp4";
             case "video/webm" -> ".webm";
             case "video/quicktime" -> ".mov";
-            default -> "";
+            default -> throw new BadRequestException("Unsupported file type");
         };
+    }
+
+    private String extractExtension(String originalName) {
+        int lastDot = originalName.lastIndexOf('.');
+        if (lastDot < 0 || lastDot >= originalName.length() - 1) {
+            return null;
+        }
+
+        String ext = originalName.substring(lastDot).toLowerCase(Locale.ROOT);
+
+        if (!ext.matches("\\.[a-z0-9]{1,10}")) {
+            throw new BadRequestException("Invalid file extension");
+        }
+
+        return ext;
+    }
+
+    private byte[] readHeader(MultipartFile file, int maxBytes) {
+        try (InputStream inputStream = file.getInputStream()) {
+            return inputStream.readNBytes(maxBytes);
+        } catch (IOException ex) {
+            throw new RuntimeException("Failed to inspect uploaded file", ex);
+        }
+    }
+
+    private void validateSignature(byte[] header, String mimeType, MediaType mediaType) {
+        boolean valid = switch (mimeType) {
+            case "image/jpeg" -> isJpeg(header);
+            case "image/png" -> isPng(header);
+            case "image/webp" -> isWebp(header);
+            case "image/gif" -> isGif(header);
+            case "video/mp4" -> isMp4(header);
+            case "video/webm" -> isWebm(header);
+            case "video/quicktime" -> isQuickTime(header);
+            default -> false;
+        };
+
+        if (!valid) {
+            throw new BadRequestException(
+                    mediaType == MediaType.IMAGE
+                            ? "Uploaded image content is invalid or corrupted"
+                            : "Uploaded video content is invalid or corrupted"
+            );
+        }
+    }
+
+    private boolean isJpeg(byte[] header) {
+        return header.length >= 3
+                && (header[0] & 0xFF) == 0xFF
+                && (header[1] & 0xFF) == 0xD8
+                && (header[2] & 0xFF) == 0xFF;
+    }
+
+    private boolean isPng(byte[] header) {
+        return header.length >= 8
+                && (header[0] & 0xFF) == 0x89
+                && header[1] == 0x50
+                && header[2] == 0x4E
+                && header[3] == 0x47
+                && (header[4] & 0xFF) == 0x0D
+                && (header[5] & 0xFF) == 0x0A
+                && (header[6] & 0xFF) == 0x1A
+                && (header[7] & 0xFF) == 0x0A;
+    }
+
+    private boolean isGif(byte[] header) {
+        if (header.length < 6) {
+            return false;
+        }
+
+        String signature = new String(header, 0, 6, StandardCharsets.US_ASCII);
+        return "GIF87a".equals(signature) || "GIF89a".equals(signature);
+    }
+
+    private boolean isWebp(byte[] header) {
+        if (header.length < 12) {
+            return false;
+        }
+
+        String riff = new String(header, 0, 4, StandardCharsets.US_ASCII);
+        String webp = new String(header, 8, 4, StandardCharsets.US_ASCII);
+
+        return "RIFF".equals(riff) && "WEBP".equals(webp);
+    }
+
+    private boolean isMp4(byte[] header) {
+        if (header.length < 12) {
+            return false;
+        }
+
+        String boxType = new String(header, 4, 4, StandardCharsets.US_ASCII);
+        if (!"ftyp".equals(boxType)) {
+            return false;
+        }
+
+        String brand = new String(header, 8, 4, StandardCharsets.US_ASCII);
+        return Set.of("isom", "iso2", "mp41", "mp42", "avc1", "M4V ", "M4A ").contains(brand);
+    }
+
+    private boolean isQuickTime(byte[] header) {
+        if (header.length < 12) {
+            return false;
+        }
+
+        String boxType = new String(header, 4, 4, StandardCharsets.US_ASCII);
+        if (!"ftyp".equals(boxType)) {
+            return false;
+        }
+
+        String brand = new String(header, 8, 4, StandardCharsets.US_ASCII);
+        return "qt  ".equals(brand);
+    }
+
+    private boolean isWebm(byte[] header) {
+        return header.length >= 4
+                && (header[0] & 0xFF) == 0x1A
+                && (header[1] & 0xFF) == 0x45
+                && (header[2] & 0xFF) == 0xDF
+                && (header[3] & 0xFF) == 0xA3;
     }
 
     private String sanitizeOriginalName(String originalName) {
@@ -173,7 +330,12 @@ public class MediaStorageServiceImpl implements MediaStorageService {
         }
 
         String fileName = fileNamePath.toString().trim();
-        return fileName.isBlank() ? "file" : fileName;
+
+        if (fileName.isBlank()) {
+            return "file";
+        }
+
+        return fileName.replaceAll("[\\r\\n]", "_");
     }
 
     private String normalizeMimeType(String mimeType) {

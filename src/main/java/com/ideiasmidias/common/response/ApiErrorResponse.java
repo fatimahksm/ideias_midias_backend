@@ -17,6 +17,9 @@ import java.util.Map;
 public class ApiErrorResponse {
     private boolean success;
     private String message;
+    private Integer status;
+    private String code;
+    private String path;
     private Map<String, String> errors;
     private LocalDateTime timestamp;
 }

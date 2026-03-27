@@ -23,17 +23,18 @@ public class MediaLibraryController {
 
     private final MediaLibraryService mediaLibraryService;
 
-    @PostMapping("/upload")
+    @PostMapping(
+            value = "/upload",
+            consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE
+    )
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<MediaLibraryResponse>> upload(
             @RequestParam("file") MultipartFile file,
             @AuthenticationPrincipal AdminUserPrincipal principal
     ) {
-        if (principal == null) {
-            throw new UnauthorizedException("Authentication required");
-        }
+        AdminUserPrincipal currentAdmin = requirePrincipal(principal);
 
-        MediaLibraryResponse response = mediaLibraryService.upload(file, principal.getId());
+        MediaLibraryResponse response = mediaLibraryService.upload(file, currentAdmin.getId());
 
         return ResponseEntity.status(HttpStatus.CREATED).body(
                 ApiResponse.<MediaLibraryResponse>builder()
@@ -46,8 +47,14 @@ public class MediaLibraryController {
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
-    public ResponseEntity<ApiResponse<MediaLibraryResponse>> getById(@PathVariable Long id) {
+    public ResponseEntity<ApiResponse<MediaLibraryResponse>> getById(
+            @PathVariable Long id,
+            @AuthenticationPrincipal AdminUserPrincipal principal
+    ) {
+        AdminUserPrincipal currentAdmin = requirePrincipal(principal);
+
         MediaLibraryResponse response = mediaLibraryService.getById(id);
+        ensureCanAccessMedia(currentAdmin, response);
 
         return ResponseEntity.ok(
                 ApiResponse.<MediaLibraryResponse>builder()
@@ -74,7 +81,9 @@ public class MediaLibraryController {
 
     @GetMapping("/type/{fileType}")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
-    public ResponseEntity<ApiResponse<List<MediaLibraryResponse>>> getByType(@PathVariable MediaType fileType) {
+    public ResponseEntity<ApiResponse<List<MediaLibraryResponse>>> getByType(
+            @PathVariable MediaType fileType
+    ) {
         List<MediaLibraryResponse> response = mediaLibraryService.getByType(fileType);
 
         return ResponseEntity.ok(
@@ -88,8 +97,14 @@ public class MediaLibraryController {
 
     @GetMapping("/uploader/{adminUserId}")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
-    public ResponseEntity<ApiResponse<List<MediaLibraryResponse>>> getByUploader(@PathVariable Long adminUserId) {
-        List<MediaLibraryResponse> response = mediaLibraryService.getByUploader(adminUserId);
+    public ResponseEntity<ApiResponse<List<MediaLibraryResponse>>> getByUploader(
+            @PathVariable Long adminUserId,
+            @AuthenticationPrincipal AdminUserPrincipal principal
+    ) {
+        AdminUserPrincipal currentAdmin = requirePrincipal(principal);
+        Long targetUploaderId = resolveAllowedUploaderId(currentAdmin, adminUserId);
+
+        List<MediaLibraryResponse> response = mediaLibraryService.getByUploader(targetUploaderId);
 
         return ResponseEntity.ok(
                 ApiResponse.<List<MediaLibraryResponse>>builder()
@@ -104,9 +119,14 @@ public class MediaLibraryController {
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<MediaLibraryResponse>>> getByUploaderAndType(
             @PathVariable Long adminUserId,
-            @PathVariable MediaType fileType
+            @PathVariable MediaType fileType,
+            @AuthenticationPrincipal AdminUserPrincipal principal
     ) {
-        List<MediaLibraryResponse> response = mediaLibraryService.getByUploaderAndType(adminUserId, fileType);
+        AdminUserPrincipal currentAdmin = requirePrincipal(principal);
+        Long targetUploaderId = resolveAllowedUploaderId(currentAdmin, adminUserId);
+
+        List<MediaLibraryResponse> response =
+                mediaLibraryService.getByUploaderAndType(targetUploaderId, fileType);
 
         return ResponseEntity.ok(
                 ApiResponse.<List<MediaLibraryResponse>>builder()
@@ -129,5 +149,43 @@ public class MediaLibraryController {
                         .data(null)
                         .build()
         );
+    }
+
+    private AdminUserPrincipal requirePrincipal(AdminUserPrincipal principal) {
+        if (principal == null) {
+            throw new UnauthorizedException("Authentication required");
+        }
+
+        return principal;
+    }
+
+    private Long resolveAllowedUploaderId(AdminUserPrincipal principal, Long requestedUploaderId) {
+        if (isSuperAdmin(principal)) {
+            return requestedUploaderId;
+        }
+
+        if (!principal.getId().equals(requestedUploaderId)) {
+            throw new UnauthorizedException("You are not allowed to access media uploaded by another admin");
+        }
+
+        return requestedUploaderId;
+    }
+
+    private void ensureCanAccessMedia(AdminUserPrincipal principal, MediaLibraryResponse media) {
+        if (isSuperAdmin(principal)) {
+            return;
+        }
+
+        if (media.getUploadedById() == null) {
+            throw new UnauthorizedException("You are not allowed to access this media item");
+        }
+
+        if (!principal.getId().equals(media.getUploadedById())) {
+            throw new UnauthorizedException("You are not allowed to access this media item");
+        }
+    }
+
+    private boolean isSuperAdmin(AdminUserPrincipal principal) {
+        return principal != null && "SUPER_ADMIN".equalsIgnoreCase(principal.getRole());
     }
 }
