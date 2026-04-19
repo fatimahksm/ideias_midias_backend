@@ -3,6 +3,7 @@ package com.ideiasmidias.common.exception;
 import com.ideiasmidias.common.response.ApiErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.catalina.connector.ClientAbortException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -10,6 +11,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -109,11 +111,68 @@ public class GlobalExceptionHandler {
         );
     }
 
+    @ExceptionHandler(ClientAbortException.class)
+    public ResponseEntity<Void> handleClientAbort(
+            ClientAbortException ex,
+            HttpServletRequest request
+    ) {
+        log.warn(
+                "Client aborted connection. path={}, errorType={}, message={}",
+                request.getRequestURI(),
+                ex.getClass().getSimpleName(),
+                ex.getMessage()
+        );
+
+        return ResponseEntity.noContent().build();
+    }
+
+    @ExceptionHandler(IOException.class)
+    public ResponseEntity<?> handleIoException(
+            IOException ex,
+            HttpServletRequest request
+    ) {
+        if (isMediaRequest(request)) {
+            log.warn(
+                    "I/O error during media request. path={}, errorType={}, message={}",
+                    request.getRequestURI(),
+                    ex.getClass().getSimpleName(),
+                    ex.getMessage()
+            );
+            return ResponseEntity.noContent().build();
+        }
+
+        log.error(
+                "I/O exception. path={}, errorType={}, message={}",
+                request.getRequestURI(),
+                ex.getClass().getSimpleName(),
+                ex.getMessage(),
+                ex
+        );
+
+        return buildErrorResponse(
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                "IO_ERROR",
+                "An I/O error occurred",
+                null,
+                request
+        );
+    }
+
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ApiErrorResponse> handleGeneric(
+    public ResponseEntity<?> handleGeneric(
             Exception ex,
             HttpServletRequest request
     ) {
+        if (isMediaRequest(request)) {
+            log.warn(
+                    "Unhandled exception during media request. path={}, errorType={}, message={}",
+                    request.getRequestURI(),
+                    ex.getClass().getSimpleName(),
+                    ex.getMessage()
+            );
+            return ResponseEntity.noContent().build();
+        }
+
         log.error(
                 "Unhandled exception. path={}, errorType={}, message={}",
                 request.getRequestURI(),
@@ -129,6 +188,11 @@ public class GlobalExceptionHandler {
                 null,
                 request
         );
+    }
+
+    private boolean isMediaRequest(HttpServletRequest request) {
+        String path = request.getRequestURI();
+        return path != null && path.startsWith("/uploads/");
     }
 
     private ResponseEntity<ApiErrorResponse> buildErrorResponse(

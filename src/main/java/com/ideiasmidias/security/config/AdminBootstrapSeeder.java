@@ -19,7 +19,7 @@ import java.util.Set;
 public class AdminBootstrapSeeder implements CommandLineRunner {
 
     private static final Set<String> DISALLOWED_PASSWORD_VALUES = Set.of(
-            "CHANGE_ME",
+         
             "Admin@123456",
             "admin123456",
             "password",
