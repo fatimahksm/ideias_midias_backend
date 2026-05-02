@@ -1,22 +1,16 @@
 package com.ideiasmidias.security.dto;
 
-import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
-import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Getter
 @Setter
 @Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public class AdminLoginResponse {
+public class AdminRefreshResponse {
 
     private String token;
     private String tokenType;
-    private Long expiresInMs;
-
     private Long adminId;
     private String email;
     private String role;

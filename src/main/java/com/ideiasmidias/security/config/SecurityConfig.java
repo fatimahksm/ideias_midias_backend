@@ -34,6 +34,7 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
+            
                 .cors(Customizer.withDefaults())
                 .csrf(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
@@ -48,16 +49,28 @@ public class SecurityConfig {
                 )
                 .authenticationProvider(authenticationProvider())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                .headers(headers -> headers
+                        .contentSecurityPolicy(csp -> csp
+                                .policyDirectives("default-src 'self'; frame-ancestors 'none'; object-src 'none'")
+                        )
+                        .frameOptions(frame -> frame.deny())
+                        .contentTypeOptions(Customizer.withDefaults())
+                )
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                        .requestMatchers("/api/admin/auth/login").permitAll()
+                        .requestMatchers(
+                                "/api/admin/auth/login",
+                                "/api/admin/auth/refresh",
+                                "/api/admin/auth/logout"
+                        ).permitAll()
 
                         .requestMatchers("/api/public/**").permitAll()
                         .requestMatchers("/uploads/media/**").permitAll()
                         .requestMatchers("/error").permitAll()
 
                         .requestMatchers("/api/admin/**").authenticated()
+                        .requestMatchers("/actuator/health", "/actuator/info").permitAll()
 
                         .anyRequest().denyAll()
                 );
