@@ -11,13 +11,8 @@ import lombok.Setter;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class AdminLoginResponse {
+public class AdminAuthSession {
 
-    private String token;
-    private String tokenType;
-    private Long expiresInMs;
-
-    private Long adminId;
-    private String email;
-    private String role;
+    private AdminLoginResponse response;
+    private String refreshToken;
 }

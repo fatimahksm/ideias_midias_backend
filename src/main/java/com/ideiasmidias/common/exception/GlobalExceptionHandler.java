@@ -26,14 +26,7 @@ public class GlobalExceptionHandler {
             HttpServletRequest request
     ) {
         log.warn("Resource not found. path={}, message={}", request.getRequestURI(), ex.getMessage());
-
-        return buildErrorResponse(
-                HttpStatus.NOT_FOUND,
-                "RESOURCE_NOT_FOUND",
-                ex.getMessage(),
-                null,
-                request
-        );
+        return buildErrorResponse(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", ex.getMessage(), null, request);
     }
 
     @ExceptionHandler(BadRequestException.class)
@@ -42,14 +35,7 @@ public class GlobalExceptionHandler {
             HttpServletRequest request
     ) {
         log.warn("Bad request. path={}, message={}", request.getRequestURI(), ex.getMessage());
-
-        return buildErrorResponse(
-                HttpStatus.BAD_REQUEST,
-                "BAD_REQUEST",
-                ex.getMessage(),
-                null,
-                request
-        );
+        return buildErrorResponse(HttpStatus.BAD_REQUEST, "BAD_REQUEST", ex.getMessage(), null, request);
     }
 
     @ExceptionHandler(ConflictException.class)
@@ -58,14 +44,7 @@ public class GlobalExceptionHandler {
             HttpServletRequest request
     ) {
         log.warn("Conflict. path={}, message={}", request.getRequestURI(), ex.getMessage());
-
-        return buildErrorResponse(
-                HttpStatus.CONFLICT,
-                "CONFLICT",
-                ex.getMessage(),
-                null,
-                request
-        );
+        return buildErrorResponse(HttpStatus.CONFLICT, "CONFLICT", ex.getMessage(), null, request);
     }
 
     @ExceptionHandler(UnauthorizedException.class)
@@ -74,14 +53,16 @@ public class GlobalExceptionHandler {
             HttpServletRequest request
     ) {
         log.warn("Unauthorized access. path={}, message={}", request.getRequestURI(), ex.getMessage());
+        return buildErrorResponse(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", ex.getMessage(), null, request);
+    }
 
-        return buildErrorResponse(
-                HttpStatus.UNAUTHORIZED,
-                "UNAUTHORIZED",
-                ex.getMessage(),
-                null,
-                request
-        );
+    @ExceptionHandler(TooManyRequestsException.class)
+    public ResponseEntity<ApiErrorResponse> handleTooManyRequests(
+            TooManyRequestsException ex,
+            HttpServletRequest request
+    ) {
+        log.warn("Too many requests. path={}, message={}", request.getRequestURI(), ex.getMessage());
+        return buildErrorResponse(HttpStatus.TOO_MANY_REQUESTS, "TOO_MANY_REQUESTS", ex.getMessage(), null, request);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -96,8 +77,7 @@ public class GlobalExceptionHandler {
                     ? fieldError.getField()
                     : error.getObjectName();
 
-            String errorMessage = error.getDefaultMessage();
-            errors.put(fieldName, errorMessage);
+            errors.put(fieldName, error.getDefaultMessage());
         });
 
         log.warn("Validation failed. path={}, errors={}", request.getRequestURI(), errors);

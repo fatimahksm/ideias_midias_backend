@@ -18,10 +18,10 @@ public class JwtService {
     @Value("${app.jwt.secret}")
     private String jwtSecret;
 
-    @Value("${app.jwt.expiration-ms:86400000}")
+    @Value("${app.jwt.expiration-ms:900000}")
     private long jwtExpirationMs;
 
-    public String generateToken(AdminUserPrincipal principal) {
+    public String generateAccessToken(AdminUserPrincipal principal) {
         Date now = new Date();
         Date expiry = new Date(now.getTime() + jwtExpirationMs);
 
@@ -33,6 +33,10 @@ public class JwtService {
                 .expiration(expiry)
                 .signWith(getSigningKey())
                 .compact();
+    }
+
+    public long getAccessTokenExpirationMs() {
+        return jwtExpirationMs;
     }
 
     public String extractUsername(String token) {
