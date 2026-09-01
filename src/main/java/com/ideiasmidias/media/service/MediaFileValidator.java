@@ -3,30 +3,33 @@ package com.ideiasmidias.media.service;
 import com.ideiasmidias.common.enums.MediaType;
 import com.ideiasmidias.common.exception.BadRequestException;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URI;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 
-@Service
-public class MediaStorageServiceImpl implements MediaStorageService {
+/**
+ * Shared upload validation for every {@link MediaStorageService} implementation
+ * (local disk, S3/R2, ...). Keeps the mime/extension/magic-byte checks identical
+ * no matter where the bytes end up.
+ */
+@Component
+public class MediaFileValidator {
 
     private static final Set<String> ALLOWED_IMAGE_MIME_TYPES = Set.of(
             "image/jpeg",
             "image/png",
             "image/webp",
-            "image/gif"
+            "image/gif",
+            "image/heic",
+            "image/heif"
     );
 
     private static final Set<String> ALLOWED_VIDEO_MIME_TYPES = Set.of(
@@ -35,103 +38,34 @@ public class MediaStorageServiceImpl implements MediaStorageService {
             "video/quicktime"
     );
 
-    private static final Map<String, Set<String>> ALLOWED_EXTENSIONS_BY_MIME = Map.of(
-            "image/jpeg", Set.of(".jpg", ".jpeg"),
-            "image/png", Set.of(".png"),
-            "image/webp", Set.of(".webp"),
-            "image/gif", Set.of(".gif"),
-            "video/mp4", Set.of(".mp4", ".m4v"),
-            "video/webm", Set.of(".webm"),
-            "video/quicktime", Set.of(".mov", ".qt")
+    private static final Map<String, Set<String>> ALLOWED_EXTENSIONS_BY_MIME = Map.ofEntries(
+            Map.entry("image/jpeg", Set.of(".jpg", ".jpeg")),
+            Map.entry("image/png", Set.of(".png")),
+            Map.entry("image/webp", Set.of(".webp")),
+            Map.entry("image/gif", Set.of(".gif")),
+            Map.entry("image/heic", Set.of(".heic")),
+            Map.entry("image/heif", Set.of(".heif")),
+            Map.entry("video/mp4", Set.of(".mp4", ".m4v")),
+            Map.entry("video/webm", Set.of(".webm")),
+            Map.entry("video/quicktime", Set.of(".mov", ".qt"))
     );
 
-    @Value("${app.media.upload-dir:uploads/media}")
-    private String uploadDir;
-
-    @Value("${app.media.public-url-prefix:/uploads/media/}")
-    private String publicUrlPrefix;
+    /** ISO-BMFF "ftyp" brands used by HEIC/HEIF stills (iPhone photos). */
+    private static final Set<String> HEIC_FTYP_BRANDS = Set.of(
+            "heic", "heix", "heim", "heis", "hevc", "hevx", "hevm", "hevs", "mif1", "msf1"
+    );
 
     @Value("${app.media.max-file-size-bytes:10485760}")
     private long maxFileSizeBytes;
 
-    @Override
-    public StoredMediaFile store(MultipartFile file) {
+    public record ValidatedFile(String originalName, String mimeType, MediaType mediaType, String extension) {
+    }
+
+    public ValidatedFile validate(MultipartFile file) {
         String originalName = sanitizeOriginalName(file.getOriginalFilename());
         String mimeType = normalizeMimeType(file.getContentType());
 
-        validateFile(file, originalName, mimeType);
-
-        MediaType mediaType = resolveMediaType(mimeType);
-        String extension = resolveExtension(originalName, mimeType);
-        String storedFileName = UUID.randomUUID() + extension;
-
-        Path uploadPath = getUploadPath();
-        Path targetPath = uploadPath.resolve(storedFileName).normalize();
-
-        if (!targetPath.startsWith(uploadPath)) {
-            throw new BadRequestException("Invalid file path");
-        }
-
-        try {
-            Files.createDirectories(uploadPath);
-            Files.copy(file.getInputStream(), targetPath, StandardCopyOption.REPLACE_EXISTING);
-        } catch (IOException ex) {
-            throw new RuntimeException("Failed to store uploaded file", ex);
-        }
-
-        String fileUrl = buildPublicFileUrl(storedFileName);
-
-        return new StoredMediaFile(
-                storedFileName,
-                originalName,
-                fileUrl,
-                mediaType,
-                mimeType,
-                file.getSize()
-        );
-    }
-
-    @Override
-    public void deleteByFileUrl(String fileUrl) {
-        if (fileUrl == null || fileUrl.isBlank()) {
-            return;
-        }
-
-        String pathValue = fileUrl;
-
-        try {
-            if (fileUrl.startsWith("http://") || fileUrl.startsWith("https://")) {
-                pathValue = URI.create(fileUrl).getPath();
-            }
-        } catch (Exception ignored) {
-        }
-
-        Path fileNamePath = Paths.get(pathValue).getFileName();
-        if (fileNamePath == null) {
-            return;
-        }
-
-        String fileName = fileNamePath.toString();
-        if (fileName.isBlank()) {
-            return;
-        }
-
-        Path uploadPath = getUploadPath();
-        Path targetPath = uploadPath.resolve(fileName).normalize();
-
-        if (!targetPath.startsWith(uploadPath)) {
-            return;
-        }
-
-        try {
-            Files.deleteIfExists(targetPath);
-        } catch (IOException ex) {
-            throw new RuntimeException("Failed to delete stored file", ex);
-        }
-    }
-
-    private void validateFile(MultipartFile file, String originalName, String mimeType) {
-        if (file == null || file.isEmpty()) {
+        if (file.isEmpty()) {
             throw new BadRequestException("File is required");
         }
 
@@ -144,11 +78,14 @@ public class MediaStorageServiceImpl implements MediaStorageService {
         }
 
         MediaType mediaType = resolveMediaType(mimeType);
-
         validateExtensionAgainstMime(originalName, mimeType);
 
         byte[] header = readHeader(file, 32);
         validateSignature(header, mimeType, mediaType);
+
+        String extension = resolveExtension(originalName, mimeType);
+
+        return new ValidatedFile(originalName, mimeType, mediaType, extension);
     }
 
     private MediaType resolveMediaType(String mimeType) {
@@ -193,6 +130,8 @@ public class MediaStorageServiceImpl implements MediaStorageService {
             case "image/png" -> ".png";
             case "image/webp" -> ".webp";
             case "image/gif" -> ".gif";
+            case "image/heic" -> ".heic";
+            case "image/heif" -> ".heif";
             case "video/mp4" -> ".mp4";
             case "video/webm" -> ".webm";
             case "video/quicktime" -> ".mov";
@@ -229,6 +168,7 @@ public class MediaStorageServiceImpl implements MediaStorageService {
             case "image/png" -> isPng(header);
             case "image/webp" -> isWebp(header);
             case "image/gif" -> isGif(header);
+            case "image/heic", "image/heif" -> isHeic(header);
             case "video/mp4" -> isMp4(header);
             case "video/webm" -> isWebm(header);
             case "video/quicktime" -> isQuickTime(header);
@@ -281,6 +221,21 @@ public class MediaStorageServiceImpl implements MediaStorageService {
         String webp = new String(header, 8, 4, StandardCharsets.US_ASCII);
 
         return "RIFF".equals(riff) && "WEBP".equals(webp);
+    }
+
+    /** HEIC/HEIF stills use the same ISO-BMFF "ftyp" box as MP4, just with a heic-family brand. */
+    private boolean isHeic(byte[] header) {
+        if (header.length < 12) {
+            return false;
+        }
+
+        String boxType = new String(header, 4, 4, StandardCharsets.US_ASCII);
+        if (!"ftyp".equals(boxType)) {
+            return false;
+        }
+
+        String brand = new String(header, 8, 4, StandardCharsets.US_ASCII).trim().toLowerCase(Locale.ROOT);
+        return HEIC_FTYP_BRANDS.contains(brand);
     }
 
     private boolean isMp4(byte[] header) {
@@ -340,25 +295,5 @@ public class MediaStorageServiceImpl implements MediaStorageService {
 
     private String normalizeMimeType(String mimeType) {
         return mimeType == null ? "" : mimeType.trim().toLowerCase(Locale.ROOT);
-    }
-
-    private Path getUploadPath() {
-        return Paths.get(uploadDir).toAbsolutePath().normalize();
-    }
-
-    private String buildPublicFileUrl(String storedFileName) {
-        String prefix = publicUrlPrefix == null || publicUrlPrefix.isBlank()
-                ? "/uploads/media/"
-                : publicUrlPrefix.trim();
-
-        if (!prefix.startsWith("/")) {
-            prefix = "/" + prefix;
-        }
-
-        if (!prefix.endsWith("/")) {
-            prefix = prefix + "/";
-        }
-
-        return prefix + storedFileName;
     }
 }
