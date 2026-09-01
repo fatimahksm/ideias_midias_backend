@@ -2,6 +2,7 @@ package com.ideiasmidias.media.entity;
 
 import com.ideiasmidias.adminuser.entity.AdminUser;
 import com.ideiasmidias.common.entity.BaseEntity;
+import com.ideiasmidias.common.enums.MediaProcessingStatus;
 import com.ideiasmidias.common.enums.MediaType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -47,6 +48,10 @@ public class MediaLibrary extends BaseEntity {
 
     @Column(name = "file_size")
     private Long fileSize;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "processing_status", nullable = false, length = 20)
+    private MediaProcessingStatus processingStatus = MediaProcessingStatus.READY;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "uploaded_by")
