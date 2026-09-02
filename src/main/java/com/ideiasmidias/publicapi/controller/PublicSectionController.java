@@ -1,12 +1,10 @@
 package com.ideiasmidias.publicapi.controller;
 
-import com.ideiasmidias.analytics.service.PageViewService;
 import com.ideiasmidias.common.response.ApiResponse;
 import com.ideiasmidias.section.dto.SectionDetailsResponse;
 import com.ideiasmidias.section.dto.SectionResponse;
 import com.ideiasmidias.section.service.SectionDetailsService;
 import com.ideiasmidias.section.service.SectionService;
-import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -20,7 +18,6 @@ public class PublicSectionController {
 
     private final SectionService sectionService;
     private final SectionDetailsService sectionDetailsService;
-    private final PageViewService pageViewService;
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<SectionResponse>>> getAllActiveSections() {
@@ -37,9 +34,8 @@ public class PublicSectionController {
 
     @GetMapping("/{slug}")
     public ResponseEntity<ApiResponse<SectionResponse>> getActiveSectionBySlug(
-            @PathVariable String slug, HttpServletRequest request) {
+            @PathVariable String slug) {
         SectionResponse response = sectionService.getActiveBySlug(slug);
-        pageViewService.record("/sections/" + slug, slug, request);
 
         return ResponseEntity.ok(
                 ApiResponse.<SectionResponse>builder()
