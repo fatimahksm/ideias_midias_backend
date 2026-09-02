@@ -1,8 +1,10 @@
 package com.ideiasmidias.portfolio.controller;
 
 import com.ideiasmidias.common.response.ApiResponse;
+import com.ideiasmidias.common.response.PageResponse;
 import com.ideiasmidias.portfolio.dto.PortfolioProjectRequest;
 import com.ideiasmidias.portfolio.dto.PortfolioProjectResponse;
+import com.ideiasmidias.portfolio.dto.PortfolioProjectStatsResponse;
 import com.ideiasmidias.portfolio.service.PortfolioProjectService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -74,6 +76,44 @@ public class PortfolioProjectController {
                 ApiResponse.<List<PortfolioProjectResponse>>builder()
                         .success(true)
                         .message("Portfolio projects fetched successfully")
+                        .data(response)
+                        .build()
+        );
+    }
+
+    /** Filtered, sorted page of projects for the admin listing. */
+    @GetMapping("/stats")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    public ResponseEntity<ApiResponse<PortfolioProjectStatsResponse>> stats(
+            @RequestParam(required = false) Long sectionId
+    ) {
+        return ResponseEntity.ok(
+                ApiResponse.<PortfolioProjectStatsResponse>builder()
+                        .success(true)
+                        .message("Portfolio project stats fetched successfully")
+                        .data(portfolioProjectService.stats(sectionId))
+                        .build()
+        );
+    }
+
+    @GetMapping("/page")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    public ResponseEntity<ApiResponse<PageResponse<PortfolioProjectResponse>>> search(
+            @RequestParam(required = false) Long sectionId,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) Boolean featured,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String sort,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "24") int size
+    ) {
+        PageResponse<PortfolioProjectResponse> response =
+                portfolioProjectService.search(sectionId, status, featured, search, sort, page, size);
+
+        return ResponseEntity.ok(
+                ApiResponse.<PageResponse<PortfolioProjectResponse>>builder()
+                        .success(true)
+                        .message("Portfolio projects page fetched successfully")
                         .data(response)
                         .build()
         );

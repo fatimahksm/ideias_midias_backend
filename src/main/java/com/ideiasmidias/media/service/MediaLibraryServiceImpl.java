@@ -6,6 +6,8 @@ import com.ideiasmidias.common.enums.MediaProcessingStatus;
 import com.ideiasmidias.common.enums.MediaType;
 import com.ideiasmidias.common.exception.BadRequestException;
 import com.ideiasmidias.common.exception.ResourceNotFoundException;
+import com.ideiasmidias.common.request.PageRequestFactory;
+import com.ideiasmidias.common.response.PageResponse;
 import com.ideiasmidias.media.dto.MediaLibraryResponse;
 import com.ideiasmidias.media.entity.MediaLibrary;
 import com.ideiasmidias.media.repository.MediaLibraryRepository;
@@ -13,6 +15,8 @@ import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -121,6 +125,32 @@ public class MediaLibraryServiceImpl implements MediaLibraryService {
                 .stream()
                 .map(this::mapToResponse)
                 .toList();
+    }
+
+    @Override
+    @Transactional
+    public PageResponse<MediaLibraryResponse> getPage(
+            MediaType fileType,
+            Long uploaderId,
+            int page,
+            int size
+    ) {
+        Pageable pageable = PageRequestFactory.of(page, size);
+
+        Page<MediaLibrary> result;
+
+        if (uploaderId != null && fileType != null) {
+            result = mediaLibraryRepository
+                    .findAllByUploadedBy_IdAndFileTypeOrderByIdDesc(uploaderId, fileType, pageable);
+        } else if (uploaderId != null) {
+            result = mediaLibraryRepository.findAllByUploadedBy_IdOrderByIdDesc(uploaderId, pageable);
+        } else if (fileType != null) {
+            result = mediaLibraryRepository.findAllByFileTypeOrderByIdDesc(fileType, pageable);
+        } else {
+            result = mediaLibraryRepository.findAllByOrderByIdDesc(pageable);
+        }
+
+        return PageResponse.from(result, this::mapToResponse);
     }
 
     @Override

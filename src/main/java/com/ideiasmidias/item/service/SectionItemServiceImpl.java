@@ -5,8 +5,12 @@ import com.ideiasmidias.category.repository.SectionCategoryRepository;
 import com.ideiasmidias.common.enums.SectionType;
 import com.ideiasmidias.common.exception.BadRequestException;
 import com.ideiasmidias.common.exception.ResourceNotFoundException;
+import com.ideiasmidias.common.request.ListQuery;
+import com.ideiasmidias.common.request.PageRequestFactory;
+import com.ideiasmidias.common.response.PageResponse;
 import com.ideiasmidias.item.dto.SectionItemRequest;
 import com.ideiasmidias.item.dto.SectionItemResponse;
+import com.ideiasmidias.item.dto.SectionItemStatsResponse;
 import com.ideiasmidias.item.entity.SectionItem;
 import com.ideiasmidias.item.repository.SectionItemMediaRepository;
 import com.ideiasmidias.item.repository.SectionItemRepository;
@@ -17,6 +21,7 @@ import com.ideiasmidias.sectionattribute.repository.SectionItemAttributeValueRep
 import com.ideiasmidias.sectionattribute.service.SectionAttributeDefinitionService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -71,6 +76,45 @@ public class SectionItemServiceImpl implements SectionItemService {
     @Transactional
     public SectionItemResponse getById(Long id) {
         return mapToResponse(getEntityById(id));
+    }
+
+    @Override
+    @Transactional
+    public SectionItemStatsResponse stats(Long sectionId, Long categoryId) {
+        return SectionItemStatsResponse.builder()
+                .total(sectionItemRepository.countScoped(sectionId, categoryId, null, null))
+                .active(sectionItemRepository.countScoped(sectionId, categoryId, true, null))
+                .featured(sectionItemRepository.countScoped(sectionId, categoryId, null, true))
+                .build();
+    }
+
+    @Override
+    @Transactional
+    public PageResponse<SectionItemResponse> search(
+            Long sectionId,
+            Long categoryId,
+            boolean onlyUncategorized,
+            String status,
+            Boolean isFeatured,
+            String search,
+            String sort,
+            int page,
+            int size
+    ) {
+        Pageable pageable = PageRequestFactory.of(page, size, ListQuery.sort(sort, "titleEn"));
+
+        return PageResponse.from(
+                sectionItemRepository.search(
+                        sectionId,
+                        categoryId,
+                        onlyUncategorized,
+                        ListQuery.status(status),
+                        isFeatured,
+                        ListQuery.searchPattern(search),
+                        pageable
+                ),
+                this::mapToResponse
+        );
     }
 
     @Override

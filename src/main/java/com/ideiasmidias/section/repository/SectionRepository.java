@@ -9,6 +9,8 @@ import java.util.Optional;
 
 public interface SectionRepository extends JpaRepository<Section, Long> {
 
+    long countByIsActiveTrue();
+
     Optional<Section> findBySlug(String slug);
 
     Optional<Section> findBySlugAndIsActiveTrue(String slug);
