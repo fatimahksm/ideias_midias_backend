@@ -12,10 +12,11 @@ import java.util.List;
 public class AnalyticsSummaryResponse {
 
     private long viewsToday;
-    private long viewsThisMonth;
+    private long viewsInRange;
     private long viewsAllTime;
     private long uniqueVisitorsToday;
-    private long uniqueVisitorsThisMonth;
+    private long uniqueVisitorsInRange;
+    private int rangeDays;
     private List<DailyPoint> dailySeries;
     private List<TopSection> topSections;
 
