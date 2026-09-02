@@ -12,6 +12,12 @@ public interface PageViewRepository extends JpaRepository<PageView, Long> {
 
     long countByViewedAtBetween(LocalDateTime start, LocalDateTime end);
 
+    /**
+     * Backs the dedupe window: has this visitor already opened this page
+     * recently? If so the visit is not recorded again.
+     */
+    boolean existsByVisitorHashAndPathAndViewedAtAfter(String visitorHash, String path, LocalDateTime after);
+
     @Query("select count(distinct pv.visitorHash) from PageView pv where pv.viewedAt between :start and :end")
     long countDistinctVisitorsBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
