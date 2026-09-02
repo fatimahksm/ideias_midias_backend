@@ -3,8 +3,12 @@ package com.ideiasmidias.portfolio.service;
 import com.ideiasmidias.common.enums.SectionType;
 import com.ideiasmidias.common.exception.BadRequestException;
 import com.ideiasmidias.common.exception.ResourceNotFoundException;
+import com.ideiasmidias.common.request.ListQuery;
+import com.ideiasmidias.common.request.PageRequestFactory;
+import com.ideiasmidias.common.response.PageResponse;
 import com.ideiasmidias.portfolio.dto.PortfolioProjectRequest;
 import com.ideiasmidias.portfolio.dto.PortfolioProjectResponse;
+import com.ideiasmidias.portfolio.dto.PortfolioProjectStatsResponse;
 import com.ideiasmidias.portfolio.entity.PortfolioProject;
 import com.ideiasmidias.portfolio.repository.PortfolioProjectMediaRepository;
 import com.ideiasmidias.portfolio.repository.PortfolioProjectRepository;
@@ -12,6 +16,7 @@ import com.ideiasmidias.section.entity.Section;
 import com.ideiasmidias.section.repository.SectionRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -51,6 +56,41 @@ public class PortfolioProjectServiceImpl implements PortfolioProjectService {
     @Transactional
     public PortfolioProjectResponse getById(Long id) {
         return mapToResponse(getEntityById(id));
+    }
+
+    @Override
+    @Transactional
+    public PortfolioProjectStatsResponse stats(Long sectionId) {
+        return PortfolioProjectStatsResponse.builder()
+                .total(portfolioProjectRepository.countScoped(sectionId, null, null))
+                .active(portfolioProjectRepository.countScoped(sectionId, true, null))
+                .featured(portfolioProjectRepository.countScoped(sectionId, null, true))
+                .build();
+    }
+
+    @Override
+    @Transactional
+    public PageResponse<PortfolioProjectResponse> search(
+            Long sectionId,
+            String status,
+            Boolean isFeatured,
+            String search,
+            String sort,
+            int page,
+            int size
+    ) {
+        Pageable pageable = PageRequestFactory.of(page, size, ListQuery.sort(sort, "titleEn"));
+
+        return PageResponse.from(
+                portfolioProjectRepository.search(
+                        sectionId,
+                        ListQuery.status(status),
+                        isFeatured,
+                        ListQuery.searchPattern(search),
+                        pageable
+                ),
+                this::mapToResponse
+        );
     }
 
     @Override

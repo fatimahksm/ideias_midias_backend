@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -38,6 +39,14 @@ public class VideoTranscodingService {
 
     @Value("${app.media.video.ffmpeg-path:ffmpeg}")
     private String ffmpegPath;
+
+    /**
+     * Longest side the delivered video is allowed to have. A phone clip is
+     * often 4K, which nobody on a slow connection can stream and no page
+     * layout needs; 0 keeps the original size.
+     */
+    @Value("${app.media.video.max-long-side:1280}")
+    private int maxLongSide;
 
     @Async("videoTranscodeExecutor")
     public void transcode(Long mediaId, Path tempInputPath, String rawFileUrl) {
@@ -72,18 +81,26 @@ public class VideoTranscodingService {
     }
 
     private boolean runFfmpeg(Path input, Path output) throws IOException, InterruptedException {
-        List<String> command = List.of(
+        List<String> command = new ArrayList<>(List.of(
                 ffmpegPath,
                 "-y",
                 "-i", input.toString(),
                 "-c:v", "libx264",
                 "-preset", "veryfast",
-                "-crf", "23",
+                "-crf", "23"
+        ));
+
+        if (maxLongSide > 0) {
+            command.add("-vf");
+            command.add(downscaleFilter(maxLongSide));
+        }
+
+        command.addAll(List.of(
                 "-c:a", "aac",
                 "-b:a", "128k",
                 "-movflags", "+faststart",
                 output.toString()
-        );
+        ));
 
         Process process = new ProcessBuilder(command)
                 .redirectErrorStream(true)
@@ -104,6 +121,17 @@ public class VideoTranscodingService {
         }
 
         return Files.exists(output) && Files.size(output) > 0;
+    }
+
+    /**
+     * Scales the longest side down to {@code limit}, leaving the other side to
+     * follow the aspect ratio (-2 keeps it even, which H.264 requires).
+     * Smaller videos are left alone — this only ever shrinks.
+     */
+    private String downscaleFilter(int limit) {
+        return "scale="
+                + "w='if(gte(iw,ih),min(" + limit + ",iw),-2)':"
+                + "h='if(gte(iw,ih),-2,min(" + limit + ",ih))'";
     }
 
     private void applyTranscodedResult(Long mediaId, StoredMediaFile transcoded) {
