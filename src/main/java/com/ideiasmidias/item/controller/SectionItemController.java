@@ -1,8 +1,10 @@
 package com.ideiasmidias.item.controller;
 
 import com.ideiasmidias.common.response.ApiResponse;
+import com.ideiasmidias.common.response.PageResponse;
 import com.ideiasmidias.item.dto.SectionItemRequest;
 import com.ideiasmidias.item.dto.SectionItemResponse;
+import com.ideiasmidias.item.dto.SectionItemStatsResponse;
 import com.ideiasmidias.item.service.SectionItemService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -74,6 +76,51 @@ public class SectionItemController {
                 ApiResponse.<List<SectionItemResponse>>builder()
                         .success(true)
                         .message("Section items fetched successfully")
+                        .data(response)
+                        .build()
+        );
+    }
+
+    /**
+     * The listing the items screens read. Search, filters and sorting all run
+     * in the database so the screen can ask for one page at a time.
+     */
+    @GetMapping("/stats")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    public ResponseEntity<ApiResponse<SectionItemStatsResponse>> stats(
+            @RequestParam(required = false) Long sectionId,
+            @RequestParam(required = false) Long categoryId
+    ) {
+        return ResponseEntity.ok(
+                ApiResponse.<SectionItemStatsResponse>builder()
+                        .success(true)
+                        .message("Section item stats fetched successfully")
+                        .data(sectionItemService.stats(sectionId, categoryId))
+                        .build()
+        );
+    }
+
+    @GetMapping("/page")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    public ResponseEntity<ApiResponse<PageResponse<SectionItemResponse>>> search(
+            @RequestParam(required = false) Long sectionId,
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam(defaultValue = "false") boolean uncategorized,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) Boolean featured,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String sort,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "24") int size
+    ) {
+        PageResponse<SectionItemResponse> response = sectionItemService.search(
+                sectionId, categoryId, uncategorized, status, featured, search, sort, page, size
+        );
+
+        return ResponseEntity.ok(
+                ApiResponse.<PageResponse<SectionItemResponse>>builder()
+                        .success(true)
+                        .message("Section items page fetched successfully")
                         .data(response)
                         .build()
         );

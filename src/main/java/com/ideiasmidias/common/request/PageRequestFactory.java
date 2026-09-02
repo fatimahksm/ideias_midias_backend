@@ -2,6 +2,7 @@ package com.ideiasmidias.common.request;
 
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 
 /**
  * Page parameters arrive from the browser, so they are clamped here: a
@@ -16,9 +17,18 @@ public final class PageRequestFactory {
     }
 
     public static Pageable of(int page, int size) {
-        int safePage = Math.max(page, 0);
-        int safeSize = size <= 0 ? DEFAULT_PAGE_SIZE : Math.min(size, MAX_PAGE_SIZE);
+        return PageRequest.of(safePage(page), safeSize(size));
+    }
 
-        return PageRequest.of(safePage, safeSize);
+    public static Pageable of(int page, int size, Sort sort) {
+        return PageRequest.of(safePage(page), safeSize(size), sort);
+    }
+
+    private static int safePage(int page) {
+        return Math.max(page, 0);
+    }
+
+    private static int safeSize(int size) {
+        return size <= 0 ? DEFAULT_PAGE_SIZE : Math.min(size, MAX_PAGE_SIZE);
     }
 }
