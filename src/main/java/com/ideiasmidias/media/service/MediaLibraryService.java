@@ -1,6 +1,7 @@
 package com.ideiasmidias.media.service;
 
 import com.ideiasmidias.common.enums.MediaType;
+import com.ideiasmidias.common.response.PageResponse;
 import com.ideiasmidias.media.dto.MediaLibraryResponse;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -13,6 +14,12 @@ public interface MediaLibraryService {
     MediaLibraryResponse getById(Long id);
 
     List<MediaLibraryResponse> getAll();
+
+    /**
+     * One page of the library, newest first. {@code fileType} and
+     * {@code uploaderId} are optional filters.
+     */
+    PageResponse<MediaLibraryResponse> getPage(MediaType fileType, Long uploaderId, int page, int size);
 
     List<MediaLibraryResponse> getByType(MediaType fileType);
 

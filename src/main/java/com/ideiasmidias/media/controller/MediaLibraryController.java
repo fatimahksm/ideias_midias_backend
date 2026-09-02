@@ -3,6 +3,7 @@ package com.ideiasmidias.media.controller;
 import com.ideiasmidias.common.enums.MediaType;
 import com.ideiasmidias.common.exception.UnauthorizedException;
 import com.ideiasmidias.common.response.ApiResponse;
+import com.ideiasmidias.common.response.PageResponse;
 import com.ideiasmidias.media.dto.MediaLibraryResponse;
 import com.ideiasmidias.media.service.MediaLibraryService;
 import com.ideiasmidias.security.model.AdminUserPrincipal;
@@ -74,6 +75,33 @@ public class MediaLibraryController {
                 ApiResponse.<List<MediaLibraryResponse>>builder()
                         .success(true)
                         .message("Media library items fetched successfully")
+                        .data(response)
+                        .build()
+        );
+    }
+
+    /**
+     * Paged listing for the admin screens. Non-super admins only ever see
+     * their own uploads, whatever they ask for.
+     */
+    @GetMapping("/page")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    public ResponseEntity<ApiResponse<PageResponse<MediaLibraryResponse>>> getPage(
+            @RequestParam(required = false) MediaType fileType,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "24") int size,
+            @AuthenticationPrincipal AdminUserPrincipal principal
+    ) {
+        AdminUserPrincipal currentAdmin = requirePrincipal(principal);
+        Long uploaderId = isSuperAdmin(currentAdmin) ? null : currentAdmin.getId();
+
+        PageResponse<MediaLibraryResponse> response =
+                mediaLibraryService.getPage(fileType, uploaderId, page, size);
+
+        return ResponseEntity.ok(
+                ApiResponse.<PageResponse<MediaLibraryResponse>>builder()
+                        .success(true)
+                        .message("Media library page fetched successfully")
                         .data(response)
                         .build()
         );
