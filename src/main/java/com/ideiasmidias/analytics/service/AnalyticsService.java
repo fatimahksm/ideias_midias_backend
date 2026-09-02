@@ -10,32 +10,36 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
 public class AnalyticsService {
 
-    private static final int TREND_DAYS = 30;
+    private static final Set<Integer> ALLOWED_RANGE_DAYS = Set.of(7, 30, 90);
+    private static final int DEFAULT_RANGE_DAYS = 30;
     private static final int TOP_SECTIONS_LIMIT = 5;
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ISO_LOCAL_DATE;
 
     private final PageViewRepository pageViewRepository;
 
-    public AnalyticsSummaryResponse getSummary() {
+    public AnalyticsSummaryResponse getSummary(int requestedRangeDays) {
+        int rangeDays = ALLOWED_RANGE_DAYS.contains(requestedRangeDays) ? requestedRangeDays : DEFAULT_RANGE_DAYS;
+
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime startOfToday = LocalDate.now().atStartOfDay();
-        LocalDateTime startOfMonth = LocalDate.now().withDayOfMonth(1).atStartOfDay();
-        LocalDateTime trendStart = startOfToday.minusDays(TREND_DAYS - 1L);
+        LocalDateTime rangeStart = startOfToday.minusDays(rangeDays - 1L);
         LocalDateTime epoch = LocalDateTime.of(2000, 1, 1, 0, 0);
 
         return AnalyticsSummaryResponse.builder()
                 .viewsToday(pageViewRepository.countByViewedAtBetween(startOfToday, now))
-                .viewsThisMonth(pageViewRepository.countByViewedAtBetween(startOfMonth, now))
+                .viewsInRange(pageViewRepository.countByViewedAtBetween(rangeStart, now))
                 .viewsAllTime(pageViewRepository.countByViewedAtBetween(epoch, now))
                 .uniqueVisitorsToday(pageViewRepository.countDistinctVisitorsBetween(startOfToday, now))
-                .uniqueVisitorsThisMonth(pageViewRepository.countDistinctVisitorsBetween(startOfMonth, now))
-                .dailySeries(buildDailySeries(trendStart))
-                .topSections(buildTopSections(startOfMonth))
+                .uniqueVisitorsInRange(pageViewRepository.countDistinctVisitorsBetween(rangeStart, now))
+                .rangeDays(rangeDays)
+                .dailySeries(buildDailySeries(rangeStart))
+                .topSections(buildTopSections(rangeStart))
                 .build();
     }
 
