@@ -26,4 +26,20 @@ public class AsyncMediaConfig {
         executor.initialize();
         return executor;
     }
+
+    /**
+     * Recording a page view is a single cheap insert, but it must never
+     * slow down or fail the public request it's piggybacking on — so it
+     * always runs off-thread on its own small pool.
+     */
+    @Bean(name = "pageViewExecutor")
+    public Executor pageViewExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(1);
+        executor.setMaxPoolSize(3);
+        executor.setQueueCapacity(200);
+        executor.setThreadNamePrefix("page-view-");
+        executor.initialize();
+        return executor;
+    }
 }
