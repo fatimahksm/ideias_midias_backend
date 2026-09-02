@@ -41,3 +41,8 @@ build/
 
 ### VS Code ###
 .vscode/
+
+# Local-disk media uploads (only used when app.storage.provider=local).
+# Never track user-uploaded content in git.
+uploads/media/*
+!uploads/media/.gitkeep

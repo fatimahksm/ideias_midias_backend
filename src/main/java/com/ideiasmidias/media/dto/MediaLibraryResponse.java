@@ -1,5 +1,6 @@
 package com.ideiasmidias.media.dto;
 
+import com.ideiasmidias.common.enums.MediaProcessingStatus;
 import com.ideiasmidias.common.enums.MediaType;
 import lombok.Builder;
 import lombok.Getter;
@@ -19,6 +20,7 @@ public class MediaLibraryResponse {
     private MediaType fileType;
     private String mimeType;
     private Long fileSize;
+    private MediaProcessingStatus processingStatus;
     private Long uploadedById;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

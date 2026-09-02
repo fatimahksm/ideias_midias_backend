@@ -2,6 +2,7 @@ package com.ideiasmidias.media.service;
 
 import com.ideiasmidias.adminuser.entity.AdminUser;
 import com.ideiasmidias.adminuser.repository.AdminUserRepository;
+import com.ideiasmidias.common.enums.MediaProcessingStatus;
 import com.ideiasmidias.common.enums.MediaType;
 import com.ideiasmidias.common.exception.BadRequestException;
 import com.ideiasmidias.common.exception.ResourceNotFoundException;
@@ -11,9 +12,13 @@ import com.ideiasmidias.media.repository.MediaLibraryRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 
 @Slf4j
@@ -25,6 +30,10 @@ public class MediaLibraryServiceImpl implements MediaLibraryService {
     private final MediaLibraryRepository mediaLibraryRepository;
     private final AdminUserRepository adminUserRepository;
     private final MediaStorageService mediaStorageService;
+    private final VideoTranscodingService videoTranscodingService;
+
+    @Value("${app.media.video.transcode-enabled:true}")
+    private boolean videoTranscodeEnabled;
 
     @Override
     public MediaLibraryResponse upload(MultipartFile file, Long uploadedById) {
@@ -35,7 +44,16 @@ public class MediaLibraryServiceImpl implements MediaLibraryService {
         AdminUser uploadedBy = adminUserRepository.findById(uploadedById)
                 .orElseThrow(() -> new ResourceNotFoundException("Admin user not found with id: " + uploadedById));
 
+        boolean shouldTranscode = videoTranscodeEnabled
+                && isVideoFile(file)
+                && !"video/mp4".equalsIgnoreCase(normalizedContentType(file));
+
+        // store() reads the file via getInputStream() first, which every
+        // MultipartFile implementation supports repeatably. Only after that
+        // do we take our own copy for ffmpeg, so neither read can starve the
+        // other regardless of the underlying multipart implementation.
         StoredMediaFile storedFile = mediaStorageService.store(file);
+        Path tempInputPath = shouldTranscode ? copyToTempFile(file) : null;
 
         MediaLibrary media = new MediaLibrary();
         media.setFileName(storedFile.storedFileName());
@@ -44,6 +62,8 @@ public class MediaLibraryServiceImpl implements MediaLibraryService {
         media.setFileType(storedFile.fileType());
         media.setMimeType(storedFile.mimeType());
         media.setFileSize(storedFile.fileSize());
+        media.setProcessingStatus(
+                tempInputPath != null ? MediaProcessingStatus.PROCESSING : MediaProcessingStatus.READY);
         media.setUploadedBy(uploadedBy);
 
         try {
@@ -56,6 +76,10 @@ public class MediaLibraryServiceImpl implements MediaLibraryService {
                     saved.getFileType(),
                     saved.getFileUrl()
             );
+
+            if (tempInputPath != null) {
+                videoTranscodingService.transcode(saved.getId(), tempInputPath, storedFile.fileUrl());
+            }
 
             return mapToResponse(saved);
         } catch (RuntimeException ex) {
@@ -167,9 +191,42 @@ public class MediaLibraryServiceImpl implements MediaLibraryService {
                 .fileType(media.getFileType())
                 .mimeType(media.getMimeType())
                 .fileSize(media.getFileSize())
+                .processingStatus(media.getProcessingStatus())
                 .uploadedById(media.getUploadedBy() != null ? media.getUploadedBy().getId() : null)
                 .createdAt(media.getCreatedAt())
                 .updatedAt(media.getUpdatedAt())
                 .build();
+    }
+
+    private boolean isVideoFile(MultipartFile file) {
+        String contentType = normalizedContentType(file);
+        return contentType.startsWith("video/");
+    }
+
+    private String normalizedContentType(MultipartFile file) {
+        String contentType = file.getContentType();
+        return contentType == null ? "" : contentType.trim().toLowerCase(java.util.Locale.ROOT);
+    }
+
+    private Path copyToTempFile(MultipartFile file) {
+        try {
+            Path tempFile = Files.createTempFile("upload-in-", resolveTempSuffix(file));
+            try (java.io.InputStream inputStream = file.getInputStream()) {
+                Files.copy(inputStream, tempFile, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            }
+            return tempFile;
+        } catch (IOException ex) {
+            throw new RuntimeException("Failed to buffer uploaded video for transcoding", ex);
+        }
+    }
+
+    private String resolveTempSuffix(MultipartFile file) {
+        String originalName = file.getOriginalFilename();
+        if (originalName == null) {
+            return ".tmp";
+        }
+
+        int lastDot = originalName.lastIndexOf('.');
+        return lastDot >= 0 ? originalName.substring(lastDot) : ".tmp";
     }
 }
