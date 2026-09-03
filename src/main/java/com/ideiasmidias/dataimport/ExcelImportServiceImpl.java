@@ -9,9 +9,14 @@ import com.ideiasmidias.common.enums.ContentBlockType;
 import com.ideiasmidias.common.enums.SectionType;
 import com.ideiasmidias.contact.dto.ContactMethodRequest;
 import com.ideiasmidias.contact.service.ContactMethodService;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ideiasmidias.contentblock.dto.SectionContentBlockRequest;
 import com.ideiasmidias.contentblock.service.SectionContentBlockService;
+import com.ideiasmidias.dataimport.dto.ImageOverrideEntry;
+import com.ideiasmidias.dataimport.dto.ImportImageField;
 import com.ideiasmidias.dataimport.dto.ImportRowError;
+import com.ideiasmidias.dataimport.dto.ImportRowSummary;
 import com.ideiasmidias.dataimport.dto.ImportSheetResult;
 import com.ideiasmidias.dataimport.dto.ImportSummaryResponse;
 import com.ideiasmidias.homecard.dto.HomeCardRequest;
@@ -40,6 +45,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -77,18 +83,21 @@ public class ExcelImportServiceImpl implements ExcelImportService {
     private final ContactMethodService contactMethodService;
 
     private final DataFormatter dataFormatter = new DataFormatter();
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
-    public ImportSummaryResponse preview(MultipartFile file) throws IOException {
-        return run(file, true);
+    public ImportSummaryResponse preview(MultipartFile file, String imageOverridesJson) throws IOException {
+        return run(file, true, imageOverridesJson);
     }
 
     @Override
-    public ImportSummaryResponse commit(MultipartFile file) throws IOException {
-        return run(file, false);
+    public ImportSummaryResponse commit(MultipartFile file, String imageOverridesJson) throws IOException {
+        return run(file, false, imageOverridesJson);
     }
 
-    private ImportSummaryResponse run(MultipartFile file, boolean dryRun) throws IOException {
+    private ImportSummaryResponse run(MultipartFile file, boolean dryRun, String imageOverridesJson) throws IOException {
+        Map<String, String> overrides = parseOverrides(imageOverridesJson);
+
         try (Workbook workbook = WorkbookFactory.create(file.getInputStream())) {
             Map<String, Long> sectionIdBySlug = new HashMap<>();
             for (Section section : sectionRepository.findAll()) {
@@ -101,21 +110,51 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             }
 
             List<ImportSheetResult> results = new ArrayList<>();
-            results.add(processSections(workbook, dryRun, sectionIdBySlug));
+            results.add(processSections(workbook, dryRun, sectionIdBySlug, overrides));
             results.add(processCategories(workbook, dryRun, sectionIdBySlug, categoryIdByKey));
-            results.add(processItems(workbook, dryRun, sectionIdBySlug, categoryIdByKey));
-            results.add(processPortfolioProjects(workbook, dryRun, sectionIdBySlug));
-            results.add(processContentBlocks(workbook, dryRun, sectionIdBySlug));
-            results.add(processHomeCards(workbook, dryRun, sectionIdBySlug));
+            results.add(processItems(workbook, dryRun, sectionIdBySlug, categoryIdByKey, overrides));
+            results.add(processPortfolioProjects(workbook, dryRun, sectionIdBySlug, overrides));
+            results.add(processContentBlocks(workbook, dryRun, sectionIdBySlug, overrides));
+            results.add(processHomeCards(workbook, dryRun, sectionIdBySlug, overrides));
             results.add(processContactMethods(workbook, dryRun));
 
             return new ImportSummaryResponse(!dryRun, results);
         }
     }
 
+    private Map<String, String> parseOverrides(String imageOverridesJson) {
+        if (imageOverridesJson == null || imageOverridesJson.isBlank()) {
+            return Collections.emptyMap();
+        }
+        try {
+            List<ImageOverrideEntry> entries = objectMapper.readValue(
+                    imageOverridesJson, new TypeReference<List<ImageOverrideEntry>>() {
+                    });
+            Map<String, String> map = new HashMap<>();
+            for (ImageOverrideEntry entry : entries) {
+                if (entry.sheet() == null || entry.rowNumber() == null || entry.field() == null) {
+                    continue;
+                }
+                if (entry.url() != null && !entry.url().isBlank()) {
+                    map.put(overrideKey(entry.sheet(), entry.rowNumber(), entry.field()), entry.url());
+                }
+            }
+            return map;
+        } catch (Exception e) {
+            return Collections.emptyMap();
+        }
+    }
+
+    private String overrideKey(String sheet, int rowNumber, String field) {
+        return sheet + "|" + rowNumber + "|" + field;
+    }
+
     // ---------------------------------------------------------------- Sections
 
-    private ImportSheetResult processSections(Workbook workbook, boolean dryRun, Map<String, Long> sectionIdBySlug) {
+    private ImportSheetResult processSections(
+            Workbook workbook, boolean dryRun,
+            Map<String, Long> sectionIdBySlug, Map<String, String> overrides
+    ) {
         String sheetName = ImportSheetName.SECTIONS.sheetName();
         Sheet sheet = workbook.getSheet(sheetName);
         if (sheet == null) {
@@ -124,6 +163,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
 
         Map<String, Integer> h = headerIndex(sheet);
         List<ImportRowError> errors = new ArrayList<>();
+        List<ImportRowSummary> rowSummaries = new ArrayList<>();
         int total = 0;
         int succeeded = 0;
         long placeholderId = -1;
@@ -134,6 +174,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                 continue;
             }
             total++;
+            int excelRowNumber = r + 1;
             List<String> rowErrors = new ArrayList<>();
 
             String slug = str(row, h, "slug");
@@ -142,8 +183,8 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             SectionType sectionType = parseEnum(SectionType.class, row, h, "section_type", rowErrors);
             String descriptionPt = str(row, h, "description_pt");
             String descriptionEn = str(row, h, "description_en");
-            String coverImageUrl = str(row, h, "cover_image_url");
-            String coverVideoUrl = str(row, h, "cover_video_url");
+            String coverImageUrl = urlField(row, h, "cover_image_url", sheetName, excelRowNumber, overrides);
+            String coverVideoUrl = urlField(row, h, "cover_video_url", sheetName, excelRowNumber, overrides);
             String displayVariant = str(row, h, "display_variant");
             String layoutStyle = str(row, h, "layout_style");
             Boolean showIntro = parseBool(row, h, "show_intro", true, rowErrors);
@@ -168,6 +209,11 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             if (normalizedSlug != null && sectionIdBySlug.containsKey(normalizedSlug)) {
                 rowErrors.add("slug '" + slug + "' is already used by another section");
             }
+
+            rowSummaries.add(new ImportRowSummary(excelRowNumber, nameEn != null ? nameEn : slug, List.of(
+                    new ImportImageField("cover_image_url", "IMAGE", coverImageUrl),
+                    new ImportImageField("cover_video_url", "VIDEO", coverVideoUrl)
+            )));
 
             if (!rowErrors.isEmpty()) {
                 errors.add(new ImportRowError(r + 1, String.join("; ", rowErrors)));
@@ -203,7 +249,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             }
         }
 
-        return new ImportSheetResult(sheetName, true, total, succeeded, errors);
+        return new ImportSheetResult(sheetName, true, total, succeeded, errors, rowSummaries);
     }
 
     // -------------------------------------------------------------- Categories
@@ -271,14 +317,14 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             }
         }
 
-        return new ImportSheetResult(sheetName, true, total, succeeded, errors);
+        return new ImportSheetResult(sheetName, true, total, succeeded, errors, List.of());
     }
 
     // ------------------------------------------------------------------ Items
 
     private ImportSheetResult processItems(
             Workbook workbook, boolean dryRun,
-            Map<String, Long> sectionIdBySlug, Map<String, Long> categoryIdByKey
+            Map<String, Long> sectionIdBySlug, Map<String, Long> categoryIdByKey, Map<String, String> overrides
     ) {
         String sheetName = ImportSheetName.ITEMS.sheetName();
         Sheet sheet = workbook.getSheet(sheetName);
@@ -288,6 +334,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
 
         Map<String, Integer> h = headerIndex(sheet);
         List<ImportRowError> errors = new ArrayList<>();
+        List<ImportRowSummary> rowSummaries = new ArrayList<>();
         int total = 0;
         int succeeded = 0;
 
@@ -297,6 +344,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                 continue;
             }
             total++;
+            int excelRowNumber = r + 1;
             List<String> rowErrors = new ArrayList<>();
 
             String sectionSlug = str(row, h, "section_slug");
@@ -307,8 +355,8 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             String shortDescriptionEn = str(row, h, "short_description_en");
             String fullDescriptionPt = str(row, h, "full_description_pt");
             String fullDescriptionEn = str(row, h, "full_description_en");
-            String coverImageUrl = str(row, h, "cover_image_url");
-            String videoUrl = str(row, h, "video_url");
+            String coverImageUrl = urlField(row, h, "cover_image_url", sheetName, excelRowNumber, overrides);
+            String videoUrl = urlField(row, h, "video_url", sheetName, excelRowNumber, overrides);
             String itemType = str(row, h, "item_type");
             String specificationsPt = str(row, h, "specifications_pt");
             String specificationsEn = str(row, h, "specifications_en");
@@ -324,6 +372,11 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             if (titleEn == null) {
                 rowErrors.add("title_en is required");
             }
+
+            rowSummaries.add(new ImportRowSummary(excelRowNumber, titleEn != null ? titleEn : titlePt, List.of(
+                    new ImportImageField("cover_image_url", "IMAGE", coverImageUrl),
+                    new ImportImageField("video_url", "VIDEO", videoUrl)
+            )));
 
             if (!rowErrors.isEmpty()) {
                 errors.add(new ImportRowError(r + 1, String.join("; ", rowErrors)));
@@ -358,12 +411,14 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             }
         }
 
-        return new ImportSheetResult(sheetName, true, total, succeeded, errors);
+        return new ImportSheetResult(sheetName, true, total, succeeded, errors, rowSummaries);
     }
 
     // -------------------------------------------------------- PortfolioProjects
 
-    private ImportSheetResult processPortfolioProjects(Workbook workbook, boolean dryRun, Map<String, Long> sectionIdBySlug) {
+    private ImportSheetResult processPortfolioProjects(
+            Workbook workbook, boolean dryRun, Map<String, Long> sectionIdBySlug, Map<String, String> overrides
+    ) {
         String sheetName = ImportSheetName.PORTFOLIO_PROJECTS.sheetName();
         Sheet sheet = workbook.getSheet(sheetName);
         if (sheet == null) {
@@ -372,6 +427,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
 
         Map<String, Integer> h = headerIndex(sheet);
         List<ImportRowError> errors = new ArrayList<>();
+        List<ImportRowSummary> rowSummaries = new ArrayList<>();
         int total = 0;
         int succeeded = 0;
 
@@ -381,6 +437,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                 continue;
             }
             total++;
+            int excelRowNumber = r + 1;
             List<String> rowErrors = new ArrayList<>();
 
             String sectionSlug = str(row, h, "section_slug");
@@ -394,8 +451,8 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             LocalDate projectDate = parseDate(row, h, "project_date", rowErrors);
             String locationPt = str(row, h, "location_pt");
             String locationEn = str(row, h, "location_en");
-            String coverImageUrl = str(row, h, "cover_image_url");
-            String videoUrl = str(row, h, "video_url");
+            String coverImageUrl = urlField(row, h, "cover_image_url", sheetName, excelRowNumber, overrides);
+            String videoUrl = urlField(row, h, "video_url", sheetName, excelRowNumber, overrides);
             Boolean isFeatured = parseBool(row, h, "is_featured", false, rowErrors);
             Boolean isActive = parseBool(row, h, "is_active", true, rowErrors);
             Integer sortOrder = parseInt(row, h, "sort_order", 0, rowErrors);
@@ -407,6 +464,11 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             if (titleEn == null) {
                 rowErrors.add("title_en is required");
             }
+
+            rowSummaries.add(new ImportRowSummary(excelRowNumber, titleEn != null ? titleEn : titlePt, List.of(
+                    new ImportImageField("cover_image_url", "IMAGE", coverImageUrl),
+                    new ImportImageField("video_url", "VIDEO", videoUrl)
+            )));
 
             if (!rowErrors.isEmpty()) {
                 errors.add(new ImportRowError(r + 1, String.join("; ", rowErrors)));
@@ -441,12 +503,14 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             }
         }
 
-        return new ImportSheetResult(sheetName, true, total, succeeded, errors);
+        return new ImportSheetResult(sheetName, true, total, succeeded, errors, rowSummaries);
     }
 
     // ----------------------------------------------------------- ContentBlocks
 
-    private ImportSheetResult processContentBlocks(Workbook workbook, boolean dryRun, Map<String, Long> sectionIdBySlug) {
+    private ImportSheetResult processContentBlocks(
+            Workbook workbook, boolean dryRun, Map<String, Long> sectionIdBySlug, Map<String, String> overrides
+    ) {
         String sheetName = ImportSheetName.CONTENT_BLOCKS.sheetName();
         Sheet sheet = workbook.getSheet(sheetName);
         if (sheet == null) {
@@ -455,6 +519,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
 
         Map<String, Integer> h = headerIndex(sheet);
         List<ImportRowError> errors = new ArrayList<>();
+        List<ImportRowSummary> rowSummaries = new ArrayList<>();
         int total = 0;
         int succeeded = 0;
 
@@ -464,6 +529,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                 continue;
             }
             total++;
+            int excelRowNumber = r + 1;
             List<String> rowErrors = new ArrayList<>();
 
             String sectionSlug = str(row, h, "section_slug");
@@ -474,12 +540,18 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             String subtitleEn = str(row, h, "subtitle_en");
             String contentPt = str(row, h, "content_pt");
             String contentEn = str(row, h, "content_en");
-            String imageUrl = str(row, h, "image_url");
-            String videoUrl = str(row, h, "video_url");
+            String imageUrl = urlField(row, h, "image_url", sheetName, excelRowNumber, overrides);
+            String videoUrl = urlField(row, h, "video_url", sheetName, excelRowNumber, overrides);
             Boolean isActive = parseBool(row, h, "is_active", true, rowErrors);
             Integer sortOrder = parseInt(row, h, "sort_order", 0, rowErrors);
 
             Long sectionId = resolveSectionId(sectionSlug, sectionIdBySlug, rowErrors);
+
+            String label = titleEn != null ? titleEn : (blockType != null ? blockType.name() + " (row " + excelRowNumber + ")" : "Row " + excelRowNumber);
+            rowSummaries.add(new ImportRowSummary(excelRowNumber, label, List.of(
+                    new ImportImageField("image_url", "IMAGE", imageUrl),
+                    new ImportImageField("video_url", "VIDEO", videoUrl)
+            )));
 
             if (!rowErrors.isEmpty()) {
                 errors.add(new ImportRowError(r + 1, String.join("; ", rowErrors)));
@@ -510,12 +582,14 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             }
         }
 
-        return new ImportSheetResult(sheetName, true, total, succeeded, errors);
+        return new ImportSheetResult(sheetName, true, total, succeeded, errors, rowSummaries);
     }
 
     // --------------------------------------------------------------- HomeCards
 
-    private ImportSheetResult processHomeCards(Workbook workbook, boolean dryRun, Map<String, Long> sectionIdBySlug) {
+    private ImportSheetResult processHomeCards(
+            Workbook workbook, boolean dryRun, Map<String, Long> sectionIdBySlug, Map<String, String> overrides
+    ) {
         String sheetName = ImportSheetName.HOME_CARDS.sheetName();
         Sheet sheet = workbook.getSheet(sheetName);
         if (sheet == null) {
@@ -524,6 +598,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
 
         Map<String, Integer> h = headerIndex(sheet);
         List<ImportRowError> errors = new ArrayList<>();
+        List<ImportRowSummary> rowSummaries = new ArrayList<>();
         int total = 0;
         int succeeded = 0;
 
@@ -533,6 +608,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                 continue;
             }
             total++;
+            int excelRowNumber = r + 1;
             List<String> rowErrors = new ArrayList<>();
 
             String sectionSlug = str(row, h, "section_slug");
@@ -540,7 +616,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             String titleEn = str(row, h, "title_en");
             String shortDescriptionPt = str(row, h, "short_description_pt");
             String shortDescriptionEn = str(row, h, "short_description_en");
-            String imageUrl = str(row, h, "image_url");
+            String imageUrl = urlField(row, h, "image_url", sheetName, excelRowNumber, overrides);
             String iconName = str(row, h, "icon_name");
             Boolean isActive = parseBool(row, h, "is_active", true, rowErrors);
             Integer sortOrder = parseInt(row, h, "sort_order", 0, rowErrors);
@@ -552,6 +628,10 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             if (titleEn == null) {
                 rowErrors.add("title_en is required");
             }
+
+            rowSummaries.add(new ImportRowSummary(excelRowNumber, titleEn != null ? titleEn : titlePt, List.of(
+                    new ImportImageField("image_url", "IMAGE", imageUrl)
+            )));
 
             if (!rowErrors.isEmpty()) {
                 errors.add(new ImportRowError(r + 1, String.join("; ", rowErrors)));
@@ -579,7 +659,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             }
         }
 
-        return new ImportSheetResult(sheetName, true, total, succeeded, errors);
+        return new ImportSheetResult(sheetName, true, total, succeeded, errors, rowSummaries);
     }
 
     // ---------------------------------------------------------- ContactMethods
@@ -640,7 +720,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             }
         }
 
-        return new ImportSheetResult(sheetName, true, total, succeeded, errors);
+        return new ImportSheetResult(sheetName, true, total, succeeded, errors, List.of());
     }
 
     // ------------------------------------------------------------------ shared
@@ -678,7 +758,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
     }
 
     private ImportSheetResult notPresent(String sheetName) {
-        return new ImportSheetResult(sheetName, false, 0, 0, List.of());
+        return new ImportSheetResult(sheetName, false, 0, 0, List.of(), List.of());
     }
 
     private boolean isBlankRow(Row row) {
@@ -729,6 +809,23 @@ public class ExcelImportServiceImpl implements ExcelImportService {
 
     private String str(Row row, Map<String, Integer> h, String field) {
         return cellStr(row, h.get(field));
+    }
+
+    /**
+     * Reads an image/video column, letting a Gallery pick sent by the
+     * frontend win over whatever text is in the Excel cell — the whole
+     * point being that a spreadsheet cell cannot hold an actual picture, so
+     * this is how a row ends up with a real, usable media URL.
+     */
+    private String urlField(
+            Row row, Map<String, Integer> h, String field,
+            String sheetName, int excelRowNumber, Map<String, String> overrides
+    ) {
+        String override = overrides.get(overrideKey(sheetName, excelRowNumber, field));
+        if (override != null && !override.isBlank()) {
+            return override;
+        }
+        return str(row, h, field);
     }
 
     private Boolean parseBool(Row row, Map<String, Integer> h, String field, Boolean defaultVal, List<String> rowErrors) {

@@ -7,6 +7,7 @@ public record ImportSheetResult(
         boolean present,
         int totalDataRows,
         int succeeded,
-        List<ImportRowError> errors
+        List<ImportRowError> errors,
+        List<ImportRowSummary> rows
 ) {
 }
