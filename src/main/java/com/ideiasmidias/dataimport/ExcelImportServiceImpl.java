@@ -13,8 +13,9 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ideiasmidias.contentblock.dto.SectionContentBlockRequest;
 import com.ideiasmidias.contentblock.service.SectionContentBlockService;
-import com.ideiasmidias.dataimport.dto.ImageOverrideEntry;
-import com.ideiasmidias.dataimport.dto.ImportImageField;
+import com.ideiasmidias.dataimport.dto.FieldOverride;
+import com.ideiasmidias.dataimport.dto.ImportFieldMeta;
+import com.ideiasmidias.dataimport.dto.ImportFieldOption;
 import com.ideiasmidias.dataimport.dto.ImportRowError;
 import com.ideiasmidias.dataimport.dto.ImportRowSummary;
 import com.ideiasmidias.dataimport.dto.ImportSheetResult;
@@ -47,6 +48,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -66,6 +68,15 @@ import java.util.Map;
  * with everything already in the database and is extended as each sheet's
  * rows are created — so a single workbook can reference a section created a
  * few rows above it in the very same Sections sheet.
+ *
+ * <p>Every column's effective value (the Excel cell, or a {@link FieldOverride}
+ * the admin already applied from the preview UI) is echoed back on
+ * {@link ImportRowSummary#fields()}, and every sheet carries its own column
+ * schema ({@link ImportSheetResult#fieldsMeta()}) and, for the fields that
+ * must reference another row (a section slug, a category name) or a fixed
+ * enum, the valid choices ({@link ImportSheetResult#fieldOptions()}) — so the
+ * admin UI can render a fully editable, dropdown-backed table instead of
+ * sending the admin back to the spreadsheet to fix a typo.
  */
 @Service
 @RequiredArgsConstructor
@@ -85,59 +96,179 @@ public class ExcelImportServiceImpl implements ExcelImportService {
     private final DataFormatter dataFormatter = new DataFormatter();
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    // ---------------------------------------------------------- field schema
+
+    private static final List<ImportFieldOption> SECTION_TYPE_OPTIONS = enumOptions(SectionType.values());
+    private static final List<ImportFieldOption> CONTENT_BLOCK_TYPE_OPTIONS = enumOptions(ContentBlockType.values());
+    private static final List<ImportFieldOption> CONTACT_METHOD_TYPE_OPTIONS = enumOptions(ContactMethodType.values());
+
+    private static List<ImportFieldOption> enumOptions(Enum<?>[] values) {
+        return Arrays.stream(values).map(v -> new ImportFieldOption(v.name(), v.name())).toList();
+    }
+
+    private static final List<ImportFieldMeta> SECTIONS_META = List.of(
+            new ImportFieldMeta("slug", "TEXT", true),
+            new ImportFieldMeta("name_pt", "TEXT", true),
+            new ImportFieldMeta("name_en", "TEXT", true),
+            new ImportFieldMeta("section_type", "SELECT", true),
+            new ImportFieldMeta("description_pt", "TEXT", false),
+            new ImportFieldMeta("description_en", "TEXT", false),
+            new ImportFieldMeta("cover_image_url", "IMAGE", false),
+            new ImportFieldMeta("cover_video_url", "VIDEO", false),
+            new ImportFieldMeta("display_variant", "TEXT", false),
+            new ImportFieldMeta("layout_style", "TEXT", false),
+            new ImportFieldMeta("show_intro", "BOOLEAN", false),
+            new ImportFieldMeta("show_gallery", "BOOLEAN", false),
+            new ImportFieldMeta("show_filters", "BOOLEAN", false),
+            new ImportFieldMeta("show_item_details", "BOOLEAN", false),
+            new ImportFieldMeta("details_view_mode", "TEXT", false),
+            new ImportFieldMeta("allow_custom_attributes", "BOOLEAN", false),
+            new ImportFieldMeta("is_active", "BOOLEAN", false),
+            new ImportFieldMeta("sort_order", "INTEGER", false)
+    );
+
+    private static final List<ImportFieldMeta> CATEGORIES_META = List.of(
+            new ImportFieldMeta("section_slug", "SELECT", true),
+            new ImportFieldMeta("name_pt", "TEXT", true),
+            new ImportFieldMeta("name_en", "TEXT", true),
+            new ImportFieldMeta("description_pt", "TEXT", false),
+            new ImportFieldMeta("description_en", "TEXT", false),
+            new ImportFieldMeta("is_active", "BOOLEAN", false),
+            new ImportFieldMeta("sort_order", "INTEGER", false)
+    );
+
+    private static final List<ImportFieldMeta> ITEMS_META = List.of(
+            new ImportFieldMeta("section_slug", "SELECT", true),
+            new ImportFieldMeta("category_name_en", "SELECT", false),
+            new ImportFieldMeta("title_pt", "TEXT", true),
+            new ImportFieldMeta("title_en", "TEXT", true),
+            new ImportFieldMeta("short_description_pt", "TEXT", false),
+            new ImportFieldMeta("short_description_en", "TEXT", false),
+            new ImportFieldMeta("full_description_pt", "TEXT", false),
+            new ImportFieldMeta("full_description_en", "TEXT", false),
+            new ImportFieldMeta("cover_image_url", "IMAGE", false),
+            new ImportFieldMeta("video_url", "VIDEO", false),
+            new ImportFieldMeta("item_type", "TEXT", false),
+            new ImportFieldMeta("specifications_pt", "TEXT", false),
+            new ImportFieldMeta("specifications_en", "TEXT", false),
+            new ImportFieldMeta("is_featured", "BOOLEAN", false),
+            new ImportFieldMeta("is_active", "BOOLEAN", false),
+            new ImportFieldMeta("sort_order", "INTEGER", false)
+    );
+
+    private static final List<ImportFieldMeta> PORTFOLIO_PROJECTS_META = List.of(
+            new ImportFieldMeta("section_slug", "SELECT", true),
+            new ImportFieldMeta("title_pt", "TEXT", true),
+            new ImportFieldMeta("title_en", "TEXT", true),
+            new ImportFieldMeta("short_description_pt", "TEXT", false),
+            new ImportFieldMeta("short_description_en", "TEXT", false),
+            new ImportFieldMeta("full_description_pt", "TEXT", false),
+            new ImportFieldMeta("full_description_en", "TEXT", false),
+            new ImportFieldMeta("client_name", "TEXT", false),
+            new ImportFieldMeta("project_date", "DATE", false),
+            new ImportFieldMeta("location_pt", "TEXT", false),
+            new ImportFieldMeta("location_en", "TEXT", false),
+            new ImportFieldMeta("cover_image_url", "IMAGE", false),
+            new ImportFieldMeta("video_url", "VIDEO", false),
+            new ImportFieldMeta("is_featured", "BOOLEAN", false),
+            new ImportFieldMeta("is_active", "BOOLEAN", false),
+            new ImportFieldMeta("sort_order", "INTEGER", false)
+    );
+
+    private static final List<ImportFieldMeta> CONTENT_BLOCKS_META = List.of(
+            new ImportFieldMeta("section_slug", "SELECT", true),
+            new ImportFieldMeta("block_type", "SELECT", true),
+            new ImportFieldMeta("title_pt", "TEXT", false),
+            new ImportFieldMeta("title_en", "TEXT", false),
+            new ImportFieldMeta("subtitle_pt", "TEXT", false),
+            new ImportFieldMeta("subtitle_en", "TEXT", false),
+            new ImportFieldMeta("content_pt", "TEXT", false),
+            new ImportFieldMeta("content_en", "TEXT", false),
+            new ImportFieldMeta("image_url", "IMAGE", false),
+            new ImportFieldMeta("video_url", "VIDEO", false),
+            new ImportFieldMeta("is_active", "BOOLEAN", false),
+            new ImportFieldMeta("sort_order", "INTEGER", false)
+    );
+
+    private static final List<ImportFieldMeta> HOME_CARDS_META = List.of(
+            new ImportFieldMeta("section_slug", "SELECT", true),
+            new ImportFieldMeta("title_pt", "TEXT", true),
+            new ImportFieldMeta("title_en", "TEXT", true),
+            new ImportFieldMeta("short_description_pt", "TEXT", false),
+            new ImportFieldMeta("short_description_en", "TEXT", false),
+            new ImportFieldMeta("image_url", "IMAGE", false),
+            new ImportFieldMeta("icon_name", "TEXT", false),
+            new ImportFieldMeta("is_active", "BOOLEAN", false),
+            new ImportFieldMeta("sort_order", "INTEGER", false)
+    );
+
+    private static final List<ImportFieldMeta> CONTACT_METHODS_META = List.of(
+            new ImportFieldMeta("type", "SELECT", true),
+            new ImportFieldMeta("label_pt", "TEXT", false),
+            new ImportFieldMeta("label_en", "TEXT", false),
+            new ImportFieldMeta("value", "TEXT", true),
+            new ImportFieldMeta("icon_name", "TEXT", false),
+            new ImportFieldMeta("is_active", "BOOLEAN", false),
+            new ImportFieldMeta("sort_order", "INTEGER", false)
+    );
+
     @Override
-    public ImportSummaryResponse preview(MultipartFile file, String imageOverridesJson) throws IOException {
-        return run(file, true, imageOverridesJson);
+    public ImportSummaryResponse preview(MultipartFile file, String fieldOverridesJson) throws IOException {
+        return run(file, true, fieldOverridesJson);
     }
 
     @Override
-    public ImportSummaryResponse commit(MultipartFile file, String imageOverridesJson) throws IOException {
-        return run(file, false, imageOverridesJson);
+    public ImportSummaryResponse commit(MultipartFile file, String fieldOverridesJson) throws IOException {
+        return run(file, false, fieldOverridesJson);
     }
 
-    private ImportSummaryResponse run(MultipartFile file, boolean dryRun, String imageOverridesJson) throws IOException {
-        Map<String, String> overrides = parseOverrides(imageOverridesJson);
+    private ImportSummaryResponse run(MultipartFile file, boolean dryRun, String fieldOverridesJson) throws IOException {
+        Map<String, String> overrides = parseOverrides(fieldOverridesJson);
 
         try (Workbook workbook = WorkbookFactory.create(file.getInputStream())) {
             Map<String, Long> sectionIdBySlug = new HashMap<>();
+            List<ImportFieldOption> sectionOptions = new ArrayList<>();
             for (Section section : sectionRepository.findAll()) {
-                sectionIdBySlug.put(section.getSlug().trim().toLowerCase(), section.getId());
+                String slug = section.getSlug().trim().toLowerCase();
+                sectionIdBySlug.put(slug, section.getId());
+                sectionOptions.add(new ImportFieldOption(slug, section.getNameEn() + " (" + slug + ")"));
             }
 
             Map<String, Long> categoryIdByKey = new HashMap<>();
+            List<ImportFieldOption> categoryOptions = new ArrayList<>();
             for (SectionCategory category : sectionCategoryRepository.findAll()) {
                 categoryIdByKey.put(categoryKey(category.getSection().getId(), category.getNameEn()), category.getId());
+                String sectionSlug = category.getSection().getSlug().trim().toLowerCase();
+                categoryOptions.add(new ImportFieldOption(category.getNameEn(), category.getNameEn(), sectionSlug));
             }
 
             List<ImportSheetResult> results = new ArrayList<>();
-            results.add(processSections(workbook, dryRun, sectionIdBySlug, overrides));
-            results.add(processCategories(workbook, dryRun, sectionIdBySlug, categoryIdByKey));
-            results.add(processItems(workbook, dryRun, sectionIdBySlug, categoryIdByKey, overrides));
-            results.add(processPortfolioProjects(workbook, dryRun, sectionIdBySlug, overrides));
-            results.add(processContentBlocks(workbook, dryRun, sectionIdBySlug, overrides));
-            results.add(processHomeCards(workbook, dryRun, sectionIdBySlug, overrides));
-            results.add(processContactMethods(workbook, dryRun));
+            results.add(processSections(workbook, dryRun, sectionIdBySlug, overrides, sectionOptions));
+            results.add(processCategories(workbook, dryRun, sectionIdBySlug, categoryIdByKey, overrides, sectionOptions, categoryOptions));
+            results.add(processItems(workbook, dryRun, sectionIdBySlug, categoryIdByKey, overrides, sectionOptions, categoryOptions));
+            results.add(processPortfolioProjects(workbook, dryRun, sectionIdBySlug, overrides, sectionOptions));
+            results.add(processContentBlocks(workbook, dryRun, sectionIdBySlug, overrides, sectionOptions));
+            results.add(processHomeCards(workbook, dryRun, sectionIdBySlug, overrides, sectionOptions));
+            results.add(processContactMethods(workbook, dryRun, overrides));
 
             return new ImportSummaryResponse(!dryRun, results);
         }
     }
 
-    private Map<String, String> parseOverrides(String imageOverridesJson) {
-        if (imageOverridesJson == null || imageOverridesJson.isBlank()) {
+    private Map<String, String> parseOverrides(String fieldOverridesJson) {
+        if (fieldOverridesJson == null || fieldOverridesJson.isBlank()) {
             return Collections.emptyMap();
         }
         try {
-            List<ImageOverrideEntry> entries = objectMapper.readValue(
-                    imageOverridesJson, new TypeReference<List<ImageOverrideEntry>>() {
+            List<FieldOverride> entries = objectMapper.readValue(
+                    fieldOverridesJson, new TypeReference<List<FieldOverride>>() {
                     });
             Map<String, String> map = new HashMap<>();
-            for (ImageOverrideEntry entry : entries) {
-                if (entry.sheet() == null || entry.rowNumber() == null || entry.field() == null) {
+            for (FieldOverride entry : entries) {
+                if (entry.sheet() == null || entry.rowNumber() == null || entry.field() == null || entry.value() == null) {
                     continue;
                 }
-                if (entry.url() != null && !entry.url().isBlank()) {
-                    map.put(overrideKey(entry.sheet(), entry.rowNumber(), entry.field()), entry.url());
-                }
+                map.put(overrideKey(entry.sheet(), entry.rowNumber(), entry.field()), entry.value());
             }
             return map;
         } catch (Exception e) {
@@ -153,12 +284,13 @@ public class ExcelImportServiceImpl implements ExcelImportService {
 
     private ImportSheetResult processSections(
             Workbook workbook, boolean dryRun,
-            Map<String, Long> sectionIdBySlug, Map<String, String> overrides
+            Map<String, Long> sectionIdBySlug, Map<String, String> overrides,
+            List<ImportFieldOption> sectionOptions
     ) {
         String sheetName = ImportSheetName.SECTIONS.sheetName();
         Sheet sheet = workbook.getSheet(sheetName);
         if (sheet == null) {
-            return notPresent(sheetName);
+            return notPresent(sheetName, SECTIONS_META, Map.of("section_type", SECTION_TYPE_OPTIONS));
         }
 
         Map<String, Integer> h = headerIndex(sheet);
@@ -177,24 +309,32 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             int excelRowNumber = r + 1;
             List<String> rowErrors = new ArrayList<>();
 
-            String slug = str(row, h, "slug");
-            String namePt = str(row, h, "name_pt");
-            String nameEn = str(row, h, "name_en");
-            SectionType sectionType = parseEnum(SectionType.class, row, h, "section_type", rowErrors);
-            String descriptionPt = str(row, h, "description_pt");
-            String descriptionEn = str(row, h, "description_en");
-            String coverImageUrl = urlField(row, h, "cover_image_url", sheetName, excelRowNumber, overrides);
-            String coverVideoUrl = urlField(row, h, "cover_video_url", sheetName, excelRowNumber, overrides);
-            String displayVariant = str(row, h, "display_variant");
-            String layoutStyle = str(row, h, "layout_style");
-            Boolean showIntro = parseBool(row, h, "show_intro", true, rowErrors);
-            Boolean showGallery = parseBool(row, h, "show_gallery", false, rowErrors);
-            Boolean showFilters = parseBool(row, h, "show_filters", false, rowErrors);
-            Boolean showItemDetails = parseBool(row, h, "show_item_details", true, rowErrors);
-            String detailsViewMode = str(row, h, "details_view_mode");
-            Boolean allowCustomAttributes = parseBool(row, h, "allow_custom_attributes", true, rowErrors);
-            Boolean isActive = parseBool(row, h, "is_active", true, rowErrors);
-            Integer sortOrder = parseInt(row, h, "sort_order", 0, rowErrors);
+            String slug = effective(row, h, "slug", sheetName, excelRowNumber, overrides);
+            String namePt = effective(row, h, "name_pt", sheetName, excelRowNumber, overrides);
+            String nameEn = effective(row, h, "name_en", sheetName, excelRowNumber, overrides);
+            String sectionTypeRaw = effective(row, h, "section_type", sheetName, excelRowNumber, overrides);
+            SectionType sectionType = parseEnum(SectionType.class, sectionTypeRaw, "section_type", rowErrors);
+            String descriptionPt = effective(row, h, "description_pt", sheetName, excelRowNumber, overrides);
+            String descriptionEn = effective(row, h, "description_en", sheetName, excelRowNumber, overrides);
+            String coverImageUrl = effective(row, h, "cover_image_url", sheetName, excelRowNumber, overrides);
+            String coverVideoUrl = effective(row, h, "cover_video_url", sheetName, excelRowNumber, overrides);
+            String displayVariant = effective(row, h, "display_variant", sheetName, excelRowNumber, overrides);
+            String layoutStyle = effective(row, h, "layout_style", sheetName, excelRowNumber, overrides);
+            String showIntroRaw = effective(row, h, "show_intro", sheetName, excelRowNumber, overrides);
+            Boolean showIntro = parseBool(showIntroRaw, "show_intro", true, rowErrors);
+            String showGalleryRaw = effective(row, h, "show_gallery", sheetName, excelRowNumber, overrides);
+            Boolean showGallery = parseBool(showGalleryRaw, "show_gallery", false, rowErrors);
+            String showFiltersRaw = effective(row, h, "show_filters", sheetName, excelRowNumber, overrides);
+            Boolean showFilters = parseBool(showFiltersRaw, "show_filters", false, rowErrors);
+            String showItemDetailsRaw = effective(row, h, "show_item_details", sheetName, excelRowNumber, overrides);
+            Boolean showItemDetails = parseBool(showItemDetailsRaw, "show_item_details", true, rowErrors);
+            String detailsViewMode = effective(row, h, "details_view_mode", sheetName, excelRowNumber, overrides);
+            String allowCustomAttributesRaw = effective(row, h, "allow_custom_attributes", sheetName, excelRowNumber, overrides);
+            Boolean allowCustomAttributes = parseBool(allowCustomAttributesRaw, "allow_custom_attributes", true, rowErrors);
+            String isActiveRaw = effective(row, h, "is_active", sheetName, excelRowNumber, overrides);
+            Boolean isActive = parseBool(isActiveRaw, "is_active", true, rowErrors);
+            String sortOrderRaw = effective(row, h, "sort_order", sheetName, excelRowNumber, overrides);
+            Integer sortOrder = parseInt(sortOrderRaw, "sort_order", 0, rowErrors);
 
             if (slug == null) {
                 rowErrors.add("slug is required");
@@ -210,13 +350,29 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                 rowErrors.add("slug '" + slug + "' is already used by another section");
             }
 
-            rowSummaries.add(new ImportRowSummary(excelRowNumber, nameEn != null ? nameEn : slug, List.of(
-                    new ImportImageField("cover_image_url", "IMAGE", coverImageUrl),
-                    new ImportImageField("cover_video_url", "VIDEO", coverVideoUrl)
-            )));
+            Map<String, String> fields = new LinkedHashMap<>();
+            fields.put("slug", nullToEmpty(slug));
+            fields.put("name_pt", nullToEmpty(namePt));
+            fields.put("name_en", nullToEmpty(nameEn));
+            fields.put("section_type", nullToEmpty(sectionTypeRaw));
+            fields.put("description_pt", nullToEmpty(descriptionPt));
+            fields.put("description_en", nullToEmpty(descriptionEn));
+            fields.put("cover_image_url", nullToEmpty(coverImageUrl));
+            fields.put("cover_video_url", nullToEmpty(coverVideoUrl));
+            fields.put("display_variant", nullToEmpty(displayVariant));
+            fields.put("layout_style", nullToEmpty(layoutStyle));
+            fields.put("show_intro", nullToEmpty(showIntroRaw));
+            fields.put("show_gallery", nullToEmpty(showGalleryRaw));
+            fields.put("show_filters", nullToEmpty(showFiltersRaw));
+            fields.put("show_item_details", nullToEmpty(showItemDetailsRaw));
+            fields.put("details_view_mode", nullToEmpty(detailsViewMode));
+            fields.put("allow_custom_attributes", nullToEmpty(allowCustomAttributesRaw));
+            fields.put("is_active", nullToEmpty(isActiveRaw));
+            fields.put("sort_order", nullToEmpty(sortOrderRaw));
+            rowSummaries.add(new ImportRowSummary(excelRowNumber, nameEn != null ? nameEn : slug, fields));
 
             if (!rowErrors.isEmpty()) {
-                errors.add(new ImportRowError(r + 1, String.join("; ", rowErrors)));
+                errors.add(new ImportRowError(excelRowNumber, String.join("; ", rowErrors)));
                 continue;
             }
 
@@ -243,29 +399,34 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             try {
                 Long id = dryRun ? placeholderId-- : sectionService.create(request).getId();
                 sectionIdBySlug.put(normalizedSlug, id);
+                sectionOptions.add(new ImportFieldOption(normalizedSlug, nameEn + " (" + normalizedSlug + ")"));
                 succeeded++;
             } catch (RuntimeException e) {
-                errors.add(new ImportRowError(r + 1, e.getMessage()));
+                errors.add(new ImportRowError(excelRowNumber, e.getMessage()));
             }
         }
 
-        return new ImportSheetResult(sheetName, true, total, succeeded, errors, rowSummaries);
+        return new ImportSheetResult(sheetName, true, total, succeeded, errors, rowSummaries,
+                SECTIONS_META, Map.of("section_type", SECTION_TYPE_OPTIONS));
     }
 
     // -------------------------------------------------------------- Categories
 
     private ImportSheetResult processCategories(
             Workbook workbook, boolean dryRun,
-            Map<String, Long> sectionIdBySlug, Map<String, Long> categoryIdByKey
+            Map<String, Long> sectionIdBySlug, Map<String, Long> categoryIdByKey,
+            Map<String, String> overrides,
+            List<ImportFieldOption> sectionOptions, List<ImportFieldOption> categoryOptions
     ) {
         String sheetName = ImportSheetName.CATEGORIES.sheetName();
         Sheet sheet = workbook.getSheet(sheetName);
         if (sheet == null) {
-            return notPresent(sheetName);
+            return notPresent(sheetName, CATEGORIES_META, Map.of("section_slug", sectionOptions));
         }
 
         Map<String, Integer> h = headerIndex(sheet);
         List<ImportRowError> errors = new ArrayList<>();
+        List<ImportRowSummary> rowSummaries = new ArrayList<>();
         int total = 0;
         int succeeded = 0;
         long placeholderId = -1;
@@ -276,15 +437,18 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                 continue;
             }
             total++;
+            int excelRowNumber = r + 1;
             List<String> rowErrors = new ArrayList<>();
 
-            String sectionSlug = str(row, h, "section_slug");
-            String namePt = str(row, h, "name_pt");
-            String nameEn = str(row, h, "name_en");
-            String descriptionPt = str(row, h, "description_pt");
-            String descriptionEn = str(row, h, "description_en");
-            Boolean isActive = parseBool(row, h, "is_active", true, rowErrors);
-            Integer sortOrder = parseInt(row, h, "sort_order", 0, rowErrors);
+            String sectionSlug = effective(row, h, "section_slug", sheetName, excelRowNumber, overrides);
+            String namePt = effective(row, h, "name_pt", sheetName, excelRowNumber, overrides);
+            String nameEn = effective(row, h, "name_en", sheetName, excelRowNumber, overrides);
+            String descriptionPt = effective(row, h, "description_pt", sheetName, excelRowNumber, overrides);
+            String descriptionEn = effective(row, h, "description_en", sheetName, excelRowNumber, overrides);
+            String isActiveRaw = effective(row, h, "is_active", sheetName, excelRowNumber, overrides);
+            Boolean isActive = parseBool(isActiveRaw, "is_active", true, rowErrors);
+            String sortOrderRaw = effective(row, h, "sort_order", sheetName, excelRowNumber, overrides);
+            Integer sortOrder = parseInt(sortOrderRaw, "sort_order", 0, rowErrors);
 
             Long sectionId = resolveSectionId(sectionSlug, sectionIdBySlug, rowErrors);
             if (namePt == null) {
@@ -294,8 +458,18 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                 rowErrors.add("name_en is required");
             }
 
+            Map<String, String> fields = new LinkedHashMap<>();
+            fields.put("section_slug", nullToEmpty(sectionSlug));
+            fields.put("name_pt", nullToEmpty(namePt));
+            fields.put("name_en", nullToEmpty(nameEn));
+            fields.put("description_pt", nullToEmpty(descriptionPt));
+            fields.put("description_en", nullToEmpty(descriptionEn));
+            fields.put("is_active", nullToEmpty(isActiveRaw));
+            fields.put("sort_order", nullToEmpty(sortOrderRaw));
+            rowSummaries.add(new ImportRowSummary(excelRowNumber, nameEn != null ? nameEn : ("Row " + excelRowNumber), fields));
+
             if (!rowErrors.isEmpty()) {
-                errors.add(new ImportRowError(r + 1, String.join("; ", rowErrors)));
+                errors.add(new ImportRowError(excelRowNumber, String.join("; ", rowErrors)));
                 continue;
             }
 
@@ -311,25 +485,29 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             try {
                 Long id = dryRun ? placeholderId-- : sectionCategoryService.create(request).getId();
                 categoryIdByKey.put(categoryKey(sectionId, nameEn), id);
+                categoryOptions.add(new ImportFieldOption(nameEn, nameEn, sectionSlug.trim().toLowerCase()));
                 succeeded++;
             } catch (RuntimeException e) {
-                errors.add(new ImportRowError(r + 1, e.getMessage()));
+                errors.add(new ImportRowError(excelRowNumber, e.getMessage()));
             }
         }
 
-        return new ImportSheetResult(sheetName, true, total, succeeded, errors, List.of());
+        return new ImportSheetResult(sheetName, true, total, succeeded, errors, rowSummaries,
+                CATEGORIES_META, Map.of("section_slug", sectionOptions));
     }
 
     // ------------------------------------------------------------------ Items
 
     private ImportSheetResult processItems(
             Workbook workbook, boolean dryRun,
-            Map<String, Long> sectionIdBySlug, Map<String, Long> categoryIdByKey, Map<String, String> overrides
+            Map<String, Long> sectionIdBySlug, Map<String, Long> categoryIdByKey, Map<String, String> overrides,
+            List<ImportFieldOption> sectionOptions, List<ImportFieldOption> categoryOptions
     ) {
         String sheetName = ImportSheetName.ITEMS.sheetName();
         Sheet sheet = workbook.getSheet(sheetName);
         if (sheet == null) {
-            return notPresent(sheetName);
+            return notPresent(sheetName, ITEMS_META,
+                    Map.of("section_slug", sectionOptions, "category_name_en", categoryOptions));
         }
 
         Map<String, Integer> h = headerIndex(sheet);
@@ -347,22 +525,25 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             int excelRowNumber = r + 1;
             List<String> rowErrors = new ArrayList<>();
 
-            String sectionSlug = str(row, h, "section_slug");
-            String categoryNameEn = str(row, h, "category_name_en");
-            String titlePt = str(row, h, "title_pt");
-            String titleEn = str(row, h, "title_en");
-            String shortDescriptionPt = str(row, h, "short_description_pt");
-            String shortDescriptionEn = str(row, h, "short_description_en");
-            String fullDescriptionPt = str(row, h, "full_description_pt");
-            String fullDescriptionEn = str(row, h, "full_description_en");
-            String coverImageUrl = urlField(row, h, "cover_image_url", sheetName, excelRowNumber, overrides);
-            String videoUrl = urlField(row, h, "video_url", sheetName, excelRowNumber, overrides);
-            String itemType = str(row, h, "item_type");
-            String specificationsPt = str(row, h, "specifications_pt");
-            String specificationsEn = str(row, h, "specifications_en");
-            Boolean isFeatured = parseBool(row, h, "is_featured", false, rowErrors);
-            Boolean isActive = parseBool(row, h, "is_active", true, rowErrors);
-            Integer sortOrder = parseInt(row, h, "sort_order", 0, rowErrors);
+            String sectionSlug = effective(row, h, "section_slug", sheetName, excelRowNumber, overrides);
+            String categoryNameEn = effective(row, h, "category_name_en", sheetName, excelRowNumber, overrides);
+            String titlePt = effective(row, h, "title_pt", sheetName, excelRowNumber, overrides);
+            String titleEn = effective(row, h, "title_en", sheetName, excelRowNumber, overrides);
+            String shortDescriptionPt = effective(row, h, "short_description_pt", sheetName, excelRowNumber, overrides);
+            String shortDescriptionEn = effective(row, h, "short_description_en", sheetName, excelRowNumber, overrides);
+            String fullDescriptionPt = effective(row, h, "full_description_pt", sheetName, excelRowNumber, overrides);
+            String fullDescriptionEn = effective(row, h, "full_description_en", sheetName, excelRowNumber, overrides);
+            String coverImageUrl = effective(row, h, "cover_image_url", sheetName, excelRowNumber, overrides);
+            String videoUrl = effective(row, h, "video_url", sheetName, excelRowNumber, overrides);
+            String itemType = effective(row, h, "item_type", sheetName, excelRowNumber, overrides);
+            String specificationsPt = effective(row, h, "specifications_pt", sheetName, excelRowNumber, overrides);
+            String specificationsEn = effective(row, h, "specifications_en", sheetName, excelRowNumber, overrides);
+            String isFeaturedRaw = effective(row, h, "is_featured", sheetName, excelRowNumber, overrides);
+            Boolean isFeatured = parseBool(isFeaturedRaw, "is_featured", false, rowErrors);
+            String isActiveRaw = effective(row, h, "is_active", sheetName, excelRowNumber, overrides);
+            Boolean isActive = parseBool(isActiveRaw, "is_active", true, rowErrors);
+            String sortOrderRaw = effective(row, h, "sort_order", sheetName, excelRowNumber, overrides);
+            Integer sortOrder = parseInt(sortOrderRaw, "sort_order", 0, rowErrors);
 
             Long sectionId = resolveSectionId(sectionSlug, sectionIdBySlug, rowErrors);
             Long categoryId = resolveCategoryId(categoryNameEn, sectionId, categoryIdByKey, rowErrors);
@@ -373,13 +554,27 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                 rowErrors.add("title_en is required");
             }
 
-            rowSummaries.add(new ImportRowSummary(excelRowNumber, titleEn != null ? titleEn : titlePt, List.of(
-                    new ImportImageField("cover_image_url", "IMAGE", coverImageUrl),
-                    new ImportImageField("video_url", "VIDEO", videoUrl)
-            )));
+            Map<String, String> fields = new LinkedHashMap<>();
+            fields.put("section_slug", nullToEmpty(sectionSlug));
+            fields.put("category_name_en", nullToEmpty(categoryNameEn));
+            fields.put("title_pt", nullToEmpty(titlePt));
+            fields.put("title_en", nullToEmpty(titleEn));
+            fields.put("short_description_pt", nullToEmpty(shortDescriptionPt));
+            fields.put("short_description_en", nullToEmpty(shortDescriptionEn));
+            fields.put("full_description_pt", nullToEmpty(fullDescriptionPt));
+            fields.put("full_description_en", nullToEmpty(fullDescriptionEn));
+            fields.put("cover_image_url", nullToEmpty(coverImageUrl));
+            fields.put("video_url", nullToEmpty(videoUrl));
+            fields.put("item_type", nullToEmpty(itemType));
+            fields.put("specifications_pt", nullToEmpty(specificationsPt));
+            fields.put("specifications_en", nullToEmpty(specificationsEn));
+            fields.put("is_featured", nullToEmpty(isFeaturedRaw));
+            fields.put("is_active", nullToEmpty(isActiveRaw));
+            fields.put("sort_order", nullToEmpty(sortOrderRaw));
+            rowSummaries.add(new ImportRowSummary(excelRowNumber, titleEn != null ? titleEn : titlePt, fields));
 
             if (!rowErrors.isEmpty()) {
-                errors.add(new ImportRowError(r + 1, String.join("; ", rowErrors)));
+                errors.add(new ImportRowError(excelRowNumber, String.join("; ", rowErrors)));
                 continue;
             }
 
@@ -407,22 +602,24 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                 }
                 succeeded++;
             } catch (RuntimeException e) {
-                errors.add(new ImportRowError(r + 1, e.getMessage()));
+                errors.add(new ImportRowError(excelRowNumber, e.getMessage()));
             }
         }
 
-        return new ImportSheetResult(sheetName, true, total, succeeded, errors, rowSummaries);
+        return new ImportSheetResult(sheetName, true, total, succeeded, errors, rowSummaries,
+                ITEMS_META, Map.of("section_slug", sectionOptions, "category_name_en", categoryOptions));
     }
 
     // -------------------------------------------------------- PortfolioProjects
 
     private ImportSheetResult processPortfolioProjects(
-            Workbook workbook, boolean dryRun, Map<String, Long> sectionIdBySlug, Map<String, String> overrides
+            Workbook workbook, boolean dryRun, Map<String, Long> sectionIdBySlug, Map<String, String> overrides,
+            List<ImportFieldOption> sectionOptions
     ) {
         String sheetName = ImportSheetName.PORTFOLIO_PROJECTS.sheetName();
         Sheet sheet = workbook.getSheet(sheetName);
         if (sheet == null) {
-            return notPresent(sheetName);
+            return notPresent(sheetName, PORTFOLIO_PROJECTS_META, Map.of("section_slug", sectionOptions));
         }
 
         Map<String, Integer> h = headerIndex(sheet);
@@ -440,22 +637,26 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             int excelRowNumber = r + 1;
             List<String> rowErrors = new ArrayList<>();
 
-            String sectionSlug = str(row, h, "section_slug");
-            String titlePt = str(row, h, "title_pt");
-            String titleEn = str(row, h, "title_en");
-            String shortDescriptionPt = str(row, h, "short_description_pt");
-            String shortDescriptionEn = str(row, h, "short_description_en");
-            String fullDescriptionPt = str(row, h, "full_description_pt");
-            String fullDescriptionEn = str(row, h, "full_description_en");
-            String clientName = str(row, h, "client_name");
-            LocalDate projectDate = parseDate(row, h, "project_date", rowErrors);
-            String locationPt = str(row, h, "location_pt");
-            String locationEn = str(row, h, "location_en");
-            String coverImageUrl = urlField(row, h, "cover_image_url", sheetName, excelRowNumber, overrides);
-            String videoUrl = urlField(row, h, "video_url", sheetName, excelRowNumber, overrides);
-            Boolean isFeatured = parseBool(row, h, "is_featured", false, rowErrors);
-            Boolean isActive = parseBool(row, h, "is_active", true, rowErrors);
-            Integer sortOrder = parseInt(row, h, "sort_order", 0, rowErrors);
+            String sectionSlug = effective(row, h, "section_slug", sheetName, excelRowNumber, overrides);
+            String titlePt = effective(row, h, "title_pt", sheetName, excelRowNumber, overrides);
+            String titleEn = effective(row, h, "title_en", sheetName, excelRowNumber, overrides);
+            String shortDescriptionPt = effective(row, h, "short_description_pt", sheetName, excelRowNumber, overrides);
+            String shortDescriptionEn = effective(row, h, "short_description_en", sheetName, excelRowNumber, overrides);
+            String fullDescriptionPt = effective(row, h, "full_description_pt", sheetName, excelRowNumber, overrides);
+            String fullDescriptionEn = effective(row, h, "full_description_en", sheetName, excelRowNumber, overrides);
+            String clientName = effective(row, h, "client_name", sheetName, excelRowNumber, overrides);
+            String projectDateRaw = effective(row, h, "project_date", sheetName, excelRowNumber, overrides);
+            LocalDate projectDate = parseDate(projectDateRaw, "project_date", rowErrors);
+            String locationPt = effective(row, h, "location_pt", sheetName, excelRowNumber, overrides);
+            String locationEn = effective(row, h, "location_en", sheetName, excelRowNumber, overrides);
+            String coverImageUrl = effective(row, h, "cover_image_url", sheetName, excelRowNumber, overrides);
+            String videoUrl = effective(row, h, "video_url", sheetName, excelRowNumber, overrides);
+            String isFeaturedRaw = effective(row, h, "is_featured", sheetName, excelRowNumber, overrides);
+            Boolean isFeatured = parseBool(isFeaturedRaw, "is_featured", false, rowErrors);
+            String isActiveRaw = effective(row, h, "is_active", sheetName, excelRowNumber, overrides);
+            Boolean isActive = parseBool(isActiveRaw, "is_active", true, rowErrors);
+            String sortOrderRaw = effective(row, h, "sort_order", sheetName, excelRowNumber, overrides);
+            Integer sortOrder = parseInt(sortOrderRaw, "sort_order", 0, rowErrors);
 
             Long sectionId = resolveSectionId(sectionSlug, sectionIdBySlug, rowErrors);
             if (titlePt == null) {
@@ -465,13 +666,27 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                 rowErrors.add("title_en is required");
             }
 
-            rowSummaries.add(new ImportRowSummary(excelRowNumber, titleEn != null ? titleEn : titlePt, List.of(
-                    new ImportImageField("cover_image_url", "IMAGE", coverImageUrl),
-                    new ImportImageField("video_url", "VIDEO", videoUrl)
-            )));
+            Map<String, String> fields = new LinkedHashMap<>();
+            fields.put("section_slug", nullToEmpty(sectionSlug));
+            fields.put("title_pt", nullToEmpty(titlePt));
+            fields.put("title_en", nullToEmpty(titleEn));
+            fields.put("short_description_pt", nullToEmpty(shortDescriptionPt));
+            fields.put("short_description_en", nullToEmpty(shortDescriptionEn));
+            fields.put("full_description_pt", nullToEmpty(fullDescriptionPt));
+            fields.put("full_description_en", nullToEmpty(fullDescriptionEn));
+            fields.put("client_name", nullToEmpty(clientName));
+            fields.put("project_date", nullToEmpty(projectDateRaw));
+            fields.put("location_pt", nullToEmpty(locationPt));
+            fields.put("location_en", nullToEmpty(locationEn));
+            fields.put("cover_image_url", nullToEmpty(coverImageUrl));
+            fields.put("video_url", nullToEmpty(videoUrl));
+            fields.put("is_featured", nullToEmpty(isFeaturedRaw));
+            fields.put("is_active", nullToEmpty(isActiveRaw));
+            fields.put("sort_order", nullToEmpty(sortOrderRaw));
+            rowSummaries.add(new ImportRowSummary(excelRowNumber, titleEn != null ? titleEn : titlePt, fields));
 
             if (!rowErrors.isEmpty()) {
-                errors.add(new ImportRowError(r + 1, String.join("; ", rowErrors)));
+                errors.add(new ImportRowError(excelRowNumber, String.join("; ", rowErrors)));
                 continue;
             }
 
@@ -499,22 +714,25 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                 }
                 succeeded++;
             } catch (RuntimeException e) {
-                errors.add(new ImportRowError(r + 1, e.getMessage()));
+                errors.add(new ImportRowError(excelRowNumber, e.getMessage()));
             }
         }
 
-        return new ImportSheetResult(sheetName, true, total, succeeded, errors, rowSummaries);
+        return new ImportSheetResult(sheetName, true, total, succeeded, errors, rowSummaries,
+                PORTFOLIO_PROJECTS_META, Map.of("section_slug", sectionOptions));
     }
 
     // ----------------------------------------------------------- ContentBlocks
 
     private ImportSheetResult processContentBlocks(
-            Workbook workbook, boolean dryRun, Map<String, Long> sectionIdBySlug, Map<String, String> overrides
+            Workbook workbook, boolean dryRun, Map<String, Long> sectionIdBySlug, Map<String, String> overrides,
+            List<ImportFieldOption> sectionOptions
     ) {
         String sheetName = ImportSheetName.CONTENT_BLOCKS.sheetName();
         Sheet sheet = workbook.getSheet(sheetName);
         if (sheet == null) {
-            return notPresent(sheetName);
+            return notPresent(sheetName, CONTENT_BLOCKS_META,
+                    Map.of("section_slug", sectionOptions, "block_type", CONTENT_BLOCK_TYPE_OPTIONS));
         }
 
         Map<String, Integer> h = headerIndex(sheet);
@@ -532,29 +750,44 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             int excelRowNumber = r + 1;
             List<String> rowErrors = new ArrayList<>();
 
-            String sectionSlug = str(row, h, "section_slug");
-            ContentBlockType blockType = parseEnum(ContentBlockType.class, row, h, "block_type", rowErrors);
-            String titlePt = str(row, h, "title_pt");
-            String titleEn = str(row, h, "title_en");
-            String subtitlePt = str(row, h, "subtitle_pt");
-            String subtitleEn = str(row, h, "subtitle_en");
-            String contentPt = str(row, h, "content_pt");
-            String contentEn = str(row, h, "content_en");
-            String imageUrl = urlField(row, h, "image_url", sheetName, excelRowNumber, overrides);
-            String videoUrl = urlField(row, h, "video_url", sheetName, excelRowNumber, overrides);
-            Boolean isActive = parseBool(row, h, "is_active", true, rowErrors);
-            Integer sortOrder = parseInt(row, h, "sort_order", 0, rowErrors);
+            String sectionSlug = effective(row, h, "section_slug", sheetName, excelRowNumber, overrides);
+            String blockTypeRaw = effective(row, h, "block_type", sheetName, excelRowNumber, overrides);
+            ContentBlockType blockType = parseEnum(ContentBlockType.class, blockTypeRaw, "block_type", rowErrors);
+            String titlePt = effective(row, h, "title_pt", sheetName, excelRowNumber, overrides);
+            String titleEn = effective(row, h, "title_en", sheetName, excelRowNumber, overrides);
+            String subtitlePt = effective(row, h, "subtitle_pt", sheetName, excelRowNumber, overrides);
+            String subtitleEn = effective(row, h, "subtitle_en", sheetName, excelRowNumber, overrides);
+            String contentPt = effective(row, h, "content_pt", sheetName, excelRowNumber, overrides);
+            String contentEn = effective(row, h, "content_en", sheetName, excelRowNumber, overrides);
+            String imageUrl = effective(row, h, "image_url", sheetName, excelRowNumber, overrides);
+            String videoUrl = effective(row, h, "video_url", sheetName, excelRowNumber, overrides);
+            String isActiveRaw = effective(row, h, "is_active", sheetName, excelRowNumber, overrides);
+            Boolean isActive = parseBool(isActiveRaw, "is_active", true, rowErrors);
+            String sortOrderRaw = effective(row, h, "sort_order", sheetName, excelRowNumber, overrides);
+            Integer sortOrder = parseInt(sortOrderRaw, "sort_order", 0, rowErrors);
 
             Long sectionId = resolveSectionId(sectionSlug, sectionIdBySlug, rowErrors);
 
-            String label = titleEn != null ? titleEn : (blockType != null ? blockType.name() + " (row " + excelRowNumber + ")" : "Row " + excelRowNumber);
-            rowSummaries.add(new ImportRowSummary(excelRowNumber, label, List.of(
-                    new ImportImageField("image_url", "IMAGE", imageUrl),
-                    new ImportImageField("video_url", "VIDEO", videoUrl)
-            )));
+            String label = titleEn != null ? titleEn
+                    : (blockType != null ? blockType.name() + " (row " + excelRowNumber + ")" : "Row " + excelRowNumber);
+
+            Map<String, String> fields = new LinkedHashMap<>();
+            fields.put("section_slug", nullToEmpty(sectionSlug));
+            fields.put("block_type", nullToEmpty(blockTypeRaw));
+            fields.put("title_pt", nullToEmpty(titlePt));
+            fields.put("title_en", nullToEmpty(titleEn));
+            fields.put("subtitle_pt", nullToEmpty(subtitlePt));
+            fields.put("subtitle_en", nullToEmpty(subtitleEn));
+            fields.put("content_pt", nullToEmpty(contentPt));
+            fields.put("content_en", nullToEmpty(contentEn));
+            fields.put("image_url", nullToEmpty(imageUrl));
+            fields.put("video_url", nullToEmpty(videoUrl));
+            fields.put("is_active", nullToEmpty(isActiveRaw));
+            fields.put("sort_order", nullToEmpty(sortOrderRaw));
+            rowSummaries.add(new ImportRowSummary(excelRowNumber, label, fields));
 
             if (!rowErrors.isEmpty()) {
-                errors.add(new ImportRowError(r + 1, String.join("; ", rowErrors)));
+                errors.add(new ImportRowError(excelRowNumber, String.join("; ", rowErrors)));
                 continue;
             }
 
@@ -578,22 +811,24 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                 }
                 succeeded++;
             } catch (RuntimeException e) {
-                errors.add(new ImportRowError(r + 1, e.getMessage()));
+                errors.add(new ImportRowError(excelRowNumber, e.getMessage()));
             }
         }
 
-        return new ImportSheetResult(sheetName, true, total, succeeded, errors, rowSummaries);
+        return new ImportSheetResult(sheetName, true, total, succeeded, errors, rowSummaries,
+                CONTENT_BLOCKS_META, Map.of("section_slug", sectionOptions, "block_type", CONTENT_BLOCK_TYPE_OPTIONS));
     }
 
     // --------------------------------------------------------------- HomeCards
 
     private ImportSheetResult processHomeCards(
-            Workbook workbook, boolean dryRun, Map<String, Long> sectionIdBySlug, Map<String, String> overrides
+            Workbook workbook, boolean dryRun, Map<String, Long> sectionIdBySlug, Map<String, String> overrides,
+            List<ImportFieldOption> sectionOptions
     ) {
         String sheetName = ImportSheetName.HOME_CARDS.sheetName();
         Sheet sheet = workbook.getSheet(sheetName);
         if (sheet == null) {
-            return notPresent(sheetName);
+            return notPresent(sheetName, HOME_CARDS_META, Map.of("section_slug", sectionOptions));
         }
 
         Map<String, Integer> h = headerIndex(sheet);
@@ -611,15 +846,17 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             int excelRowNumber = r + 1;
             List<String> rowErrors = new ArrayList<>();
 
-            String sectionSlug = str(row, h, "section_slug");
-            String titlePt = str(row, h, "title_pt");
-            String titleEn = str(row, h, "title_en");
-            String shortDescriptionPt = str(row, h, "short_description_pt");
-            String shortDescriptionEn = str(row, h, "short_description_en");
-            String imageUrl = urlField(row, h, "image_url", sheetName, excelRowNumber, overrides);
-            String iconName = str(row, h, "icon_name");
-            Boolean isActive = parseBool(row, h, "is_active", true, rowErrors);
-            Integer sortOrder = parseInt(row, h, "sort_order", 0, rowErrors);
+            String sectionSlug = effective(row, h, "section_slug", sheetName, excelRowNumber, overrides);
+            String titlePt = effective(row, h, "title_pt", sheetName, excelRowNumber, overrides);
+            String titleEn = effective(row, h, "title_en", sheetName, excelRowNumber, overrides);
+            String shortDescriptionPt = effective(row, h, "short_description_pt", sheetName, excelRowNumber, overrides);
+            String shortDescriptionEn = effective(row, h, "short_description_en", sheetName, excelRowNumber, overrides);
+            String imageUrl = effective(row, h, "image_url", sheetName, excelRowNumber, overrides);
+            String iconName = effective(row, h, "icon_name", sheetName, excelRowNumber, overrides);
+            String isActiveRaw = effective(row, h, "is_active", sheetName, excelRowNumber, overrides);
+            Boolean isActive = parseBool(isActiveRaw, "is_active", true, rowErrors);
+            String sortOrderRaw = effective(row, h, "sort_order", sheetName, excelRowNumber, overrides);
+            Integer sortOrder = parseInt(sortOrderRaw, "sort_order", 0, rowErrors);
 
             Long sectionId = resolveSectionId(sectionSlug, sectionIdBySlug, rowErrors);
             if (titlePt == null) {
@@ -629,12 +866,20 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                 rowErrors.add("title_en is required");
             }
 
-            rowSummaries.add(new ImportRowSummary(excelRowNumber, titleEn != null ? titleEn : titlePt, List.of(
-                    new ImportImageField("image_url", "IMAGE", imageUrl)
-            )));
+            Map<String, String> fields = new LinkedHashMap<>();
+            fields.put("section_slug", nullToEmpty(sectionSlug));
+            fields.put("title_pt", nullToEmpty(titlePt));
+            fields.put("title_en", nullToEmpty(titleEn));
+            fields.put("short_description_pt", nullToEmpty(shortDescriptionPt));
+            fields.put("short_description_en", nullToEmpty(shortDescriptionEn));
+            fields.put("image_url", nullToEmpty(imageUrl));
+            fields.put("icon_name", nullToEmpty(iconName));
+            fields.put("is_active", nullToEmpty(isActiveRaw));
+            fields.put("sort_order", nullToEmpty(sortOrderRaw));
+            rowSummaries.add(new ImportRowSummary(excelRowNumber, titleEn != null ? titleEn : titlePt, fields));
 
             if (!rowErrors.isEmpty()) {
-                errors.add(new ImportRowError(r + 1, String.join("; ", rowErrors)));
+                errors.add(new ImportRowError(excelRowNumber, String.join("; ", rowErrors)));
                 continue;
             }
 
@@ -655,24 +900,26 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                 }
                 succeeded++;
             } catch (RuntimeException e) {
-                errors.add(new ImportRowError(r + 1, e.getMessage()));
+                errors.add(new ImportRowError(excelRowNumber, e.getMessage()));
             }
         }
 
-        return new ImportSheetResult(sheetName, true, total, succeeded, errors, rowSummaries);
+        return new ImportSheetResult(sheetName, true, total, succeeded, errors, rowSummaries,
+                HOME_CARDS_META, Map.of("section_slug", sectionOptions));
     }
 
     // ---------------------------------------------------------- ContactMethods
 
-    private ImportSheetResult processContactMethods(Workbook workbook, boolean dryRun) {
+    private ImportSheetResult processContactMethods(Workbook workbook, boolean dryRun, Map<String, String> overrides) {
         String sheetName = ImportSheetName.CONTACT_METHODS.sheetName();
         Sheet sheet = workbook.getSheet(sheetName);
         if (sheet == null) {
-            return notPresent(sheetName);
+            return notPresent(sheetName, CONTACT_METHODS_META, Map.of("type", CONTACT_METHOD_TYPE_OPTIONS));
         }
 
         Map<String, Integer> h = headerIndex(sheet);
         List<ImportRowError> errors = new ArrayList<>();
+        List<ImportRowSummary> rowSummaries = new ArrayList<>();
         int total = 0;
         int succeeded = 0;
 
@@ -682,22 +929,36 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                 continue;
             }
             total++;
+            int excelRowNumber = r + 1;
             List<String> rowErrors = new ArrayList<>();
 
-            ContactMethodType type = parseEnum(ContactMethodType.class, row, h, "type", rowErrors);
-            String labelPt = str(row, h, "label_pt");
-            String labelEn = str(row, h, "label_en");
-            String value = str(row, h, "value");
-            String iconName = str(row, h, "icon_name");
-            Boolean isActive = parseBool(row, h, "is_active", true, rowErrors);
-            Integer sortOrder = parseInt(row, h, "sort_order", 0, rowErrors);
+            String typeRaw = effective(row, h, "type", sheetName, excelRowNumber, overrides);
+            ContactMethodType type = parseEnum(ContactMethodType.class, typeRaw, "type", rowErrors);
+            String labelPt = effective(row, h, "label_pt", sheetName, excelRowNumber, overrides);
+            String labelEn = effective(row, h, "label_en", sheetName, excelRowNumber, overrides);
+            String value = effective(row, h, "value", sheetName, excelRowNumber, overrides);
+            String iconName = effective(row, h, "icon_name", sheetName, excelRowNumber, overrides);
+            String isActiveRaw = effective(row, h, "is_active", sheetName, excelRowNumber, overrides);
+            Boolean isActive = parseBool(isActiveRaw, "is_active", true, rowErrors);
+            String sortOrderRaw = effective(row, h, "sort_order", sheetName, excelRowNumber, overrides);
+            Integer sortOrder = parseInt(sortOrderRaw, "sort_order", 0, rowErrors);
 
             if (value == null) {
                 rowErrors.add("value is required");
             }
 
+            Map<String, String> fields = new LinkedHashMap<>();
+            fields.put("type", nullToEmpty(typeRaw));
+            fields.put("label_pt", nullToEmpty(labelPt));
+            fields.put("label_en", nullToEmpty(labelEn));
+            fields.put("value", nullToEmpty(value));
+            fields.put("icon_name", nullToEmpty(iconName));
+            fields.put("is_active", nullToEmpty(isActiveRaw));
+            fields.put("sort_order", nullToEmpty(sortOrderRaw));
+            rowSummaries.add(new ImportRowSummary(excelRowNumber, value != null ? value : ("Row " + excelRowNumber), fields));
+
             if (!rowErrors.isEmpty()) {
-                errors.add(new ImportRowError(r + 1, String.join("; ", rowErrors)));
+                errors.add(new ImportRowError(excelRowNumber, String.join("; ", rowErrors)));
                 continue;
             }
 
@@ -716,11 +977,12 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                 }
                 succeeded++;
             } catch (RuntimeException e) {
-                errors.add(new ImportRowError(r + 1, e.getMessage()));
+                errors.add(new ImportRowError(excelRowNumber, e.getMessage()));
             }
         }
 
-        return new ImportSheetResult(sheetName, true, total, succeeded, errors, List.of());
+        return new ImportSheetResult(sheetName, true, total, succeeded, errors, rowSummaries,
+                CONTACT_METHODS_META, Map.of("type", CONTACT_METHOD_TYPE_OPTIONS));
     }
 
     // ------------------------------------------------------------------ shared
@@ -757,8 +1019,8 @@ public class ExcelImportServiceImpl implements ExcelImportService {
         return id;
     }
 
-    private ImportSheetResult notPresent(String sheetName) {
-        return new ImportSheetResult(sheetName, false, 0, 0, List.of(), List.of());
+    private ImportSheetResult notPresent(String sheetName, List<ImportFieldMeta> fieldsMeta, Map<String, List<ImportFieldOption>> fieldOptions) {
+        return new ImportSheetResult(sheetName, false, 0, 0, List.of(), List.of(), fieldsMeta, fieldOptions);
     }
 
     private boolean isBlankRow(Row row) {
@@ -811,25 +1073,31 @@ public class ExcelImportServiceImpl implements ExcelImportService {
         return cellStr(row, h.get(field));
     }
 
+    private String nullToEmpty(String s) {
+        return s == null ? "" : s;
+    }
+
     /**
-     * Reads an image/video column, letting a Gallery pick sent by the
-     * frontend win over whatever text is in the Excel cell — the whole
-     * point being that a spreadsheet cell cannot hold an actual picture, so
-     * this is how a row ends up with a real, usable media URL.
+     * Reads one column's effective value: an override the admin already
+     * applied in the preview UI (an edited value, or a Gallery pick for an
+     * image/video column) always wins over the Excel cell — including a
+     * deliberately blank override, which clears the field the same as an
+     * empty cell would. Absent from the overrides map at all means "no edit
+     * yet", so the Excel cell's own text is used.
      */
-    private String urlField(
+    private String effective(
             Row row, Map<String, Integer> h, String field,
             String sheetName, int excelRowNumber, Map<String, String> overrides
     ) {
-        String override = overrides.get(overrideKey(sheetName, excelRowNumber, field));
-        if (override != null && !override.isBlank()) {
-            return override;
+        String key = overrideKey(sheetName, excelRowNumber, field);
+        if (overrides.containsKey(key)) {
+            String value = overrides.get(key);
+            return (value == null || value.isBlank()) ? null : value;
         }
         return str(row, h, field);
     }
 
-    private Boolean parseBool(Row row, Map<String, Integer> h, String field, Boolean defaultVal, List<String> rowErrors) {
-        String raw = str(row, h, field);
+    private Boolean parseBool(String raw, String field, Boolean defaultVal, List<String> rowErrors) {
         if (raw == null) {
             return defaultVal;
         }
@@ -844,8 +1112,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
         return defaultVal;
     }
 
-    private Integer parseInt(Row row, Map<String, Integer> h, String field, Integer defaultVal, List<String> rowErrors) {
-        String raw = str(row, h, field);
+    private Integer parseInt(String raw, String field, Integer defaultVal, List<String> rowErrors) {
         if (raw == null) {
             return defaultVal;
         }
@@ -857,8 +1124,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
         }
     }
 
-    private LocalDate parseDate(Row row, Map<String, Integer> h, String field, List<String> rowErrors) {
-        String raw = str(row, h, field);
+    private LocalDate parseDate(String raw, String field, List<String> rowErrors) {
         if (raw == null) {
             return null;
         }
@@ -870,8 +1136,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
         }
     }
 
-    private <E extends Enum<E>> E parseEnum(Class<E> type, Row row, Map<String, Integer> h, String field, List<String> rowErrors) {
-        String raw = str(row, h, field);
+    private <E extends Enum<E>> E parseEnum(Class<E> type, String raw, String field, List<String> rowErrors) {
         if (raw == null) {
             rowErrors.add(field + " is required");
             return null;

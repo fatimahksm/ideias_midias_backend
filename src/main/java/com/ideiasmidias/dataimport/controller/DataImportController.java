@@ -48,9 +48,9 @@ public class DataImportController {
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<ImportSummaryResponse>> preview(
             @RequestParam("file") MultipartFile file,
-            @RequestParam(value = "imageOverrides", required = false) String imageOverrides
+            @RequestParam(value = "fieldOverrides", required = false) String fieldOverrides
     ) throws IOException {
-        ImportSummaryResponse response = excelImportService.preview(file, imageOverrides);
+        ImportSummaryResponse response = excelImportService.preview(file, fieldOverrides);
 
         return ResponseEntity.ok(
                 ApiResponse.<ImportSummaryResponse>builder()
@@ -65,9 +65,9 @@ public class DataImportController {
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<ImportSummaryResponse>> commit(
             @RequestParam("file") MultipartFile file,
-            @RequestParam(value = "imageOverrides", required = false) String imageOverrides
+            @RequestParam(value = "fieldOverrides", required = false) String fieldOverrides
     ) throws IOException {
-        ImportSummaryResponse response = excelImportService.commit(file, imageOverrides);
+        ImportSummaryResponse response = excelImportService.commit(file, fieldOverrides);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(
                 ApiResponse.<ImportSummaryResponse>builder()

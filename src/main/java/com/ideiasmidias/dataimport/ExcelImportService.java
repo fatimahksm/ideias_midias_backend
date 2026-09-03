@@ -10,12 +10,13 @@ public interface ExcelImportService {
     /**
      * Validates every row without persisting anything.
      *
-     * @param imageOverridesJson optional JSON array of {@code {sheet, rowNumber, field, url}}
-     *                           entries for images/videos picked from the Gallery, which win
-     *                           over whatever the Excel cell itself holds
+     * @param fieldOverridesJson optional JSON array of {@code {sheet, rowNumber, field, value}}
+     *                           entries — any field the admin edited in the preview UI (including
+     *                           an image/video picked from the Gallery), which wins over whatever
+     *                           the Excel cell itself holds
      */
-    ImportSummaryResponse preview(MultipartFile file, String imageOverridesJson) throws IOException;
+    ImportSummaryResponse preview(MultipartFile file, String fieldOverridesJson) throws IOException;
 
-    /** Validates and persists every valid row, sheet by sheet, in dependency order. */
-    ImportSummaryResponse commit(MultipartFile file, String imageOverridesJson) throws IOException;
+    /** Validates and persists every valid row, sheet by sheet. */
+    ImportSummaryResponse commit(MultipartFile file, String fieldOverridesJson) throws IOException;
 }
