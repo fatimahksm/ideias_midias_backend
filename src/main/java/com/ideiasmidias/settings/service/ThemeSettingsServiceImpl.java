@@ -13,14 +13,34 @@ import org.springframework.stereotype.Service;
 @Transactional
 public class ThemeSettingsServiceImpl implements ThemeSettingsService {
 
+    // Used until the owner saves a theme of their own. Before this, an
+    // unsaved theme came back as an object of nulls, which the frontend
+    // could only read as "unset every colour".
+    private static final String DEFAULT_PRIMARY = "#0f172a";
+    private static final String DEFAULT_SECONDARY = "#1e293b";
+    private static final String DEFAULT_ACCENT = "#2563eb";
+    private static final String DEFAULT_BACKGROUND = "#f8fafc";
+    private static final String DEFAULT_TEXT = "#0f172a";
+    private static final String DEFAULT_HERO_OVERLAY = "#0f172aa6";
+
     private final ThemeSettingsRepository themeSettingsRepository;
 
     @Override
     public ThemeSettingsResponse getThemeSettings() {
-        ThemeSettings themeSettings = themeSettingsRepository.findTopByOrderByIdAsc()
-                .orElseGet(ThemeSettings::new);
+        return themeSettingsRepository.findTopByOrderByIdAsc()
+                .map(this::mapToResponse)
+                .orElseGet(ThemeSettingsServiceImpl::defaultResponse);
+    }
 
-        return mapToResponse(themeSettings);
+    private static ThemeSettingsResponse defaultResponse() {
+        return ThemeSettingsResponse.builder()
+                .primaryColor(DEFAULT_PRIMARY)
+                .secondaryColor(DEFAULT_SECONDARY)
+                .accentColor(DEFAULT_ACCENT)
+                .backgroundColor(DEFAULT_BACKGROUND)
+                .textColor(DEFAULT_TEXT)
+                .heroOverlayColor(DEFAULT_HERO_OVERLAY)
+                .build();
     }
 
     @Override
