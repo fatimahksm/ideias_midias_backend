@@ -55,6 +55,11 @@ public class SecurityConfig {
                         )
                         .frameOptions(frame -> frame.deny())
                         .contentTypeOptions(Customizer.withDefaults())
+                        // PublicCacheHeaderFilter decides this instead: the
+                        // admin API stays no-store, public reads may be cached
+                        // briefly. Leaving Security's writer on would overwrite
+                        // that with no-store for everything.
+                        .cacheControl(cache -> cache.disable())
                 )
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()

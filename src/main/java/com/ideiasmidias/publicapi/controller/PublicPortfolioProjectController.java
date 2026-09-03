@@ -4,6 +4,7 @@ import com.ideiasmidias.common.enums.SectionType;
 import com.ideiasmidias.common.exception.BadRequestException;
 import com.ideiasmidias.common.exception.ResourceNotFoundException;
 import com.ideiasmidias.common.response.ApiResponse;
+import com.ideiasmidias.common.response.PageResponse;
 import com.ideiasmidias.portfolio.dto.PortfolioProjectResponse;
 import com.ideiasmidias.portfolio.service.PortfolioProjectService;
 import com.ideiasmidias.section.dto.SectionResponse;
@@ -66,6 +67,37 @@ public class PublicPortfolioProjectController {
                 ApiResponse.<PortfolioProjectResponse>builder()
                         .success(true)
                         .message("Public active portfolio project fetched successfully")
+                        .data(response)
+                        .build()
+        );
+    }
+
+    /**
+     * Paged listing for the public portfolio page, so a section with a large
+     * body of work does not send every project on first load. Active only.
+     */
+    @GetMapping("/sections/{sectionId}/projects/page")
+    public ResponseEntity<ApiResponse<PageResponse<PortfolioProjectResponse>>> getActiveProjectsPage(
+            @PathVariable Long sectionId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "24") int size
+    ) {
+        SectionResponse section = getActivePortfolioSectionOrThrow(sectionId);
+
+        PageResponse<PortfolioProjectResponse> response = portfolioProjectService.search(
+                section.getId(),
+                "ACTIVE",
+                null,
+                null,
+                "sortOrder",
+                page,
+                size
+        );
+
+        return ResponseEntity.ok(
+                ApiResponse.<PageResponse<PortfolioProjectResponse>>builder()
+                        .success(true)
+                        .message("Public active portfolio projects page fetched successfully")
                         .data(response)
                         .build()
         );
