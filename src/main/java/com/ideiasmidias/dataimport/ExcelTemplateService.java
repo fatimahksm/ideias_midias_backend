@@ -31,8 +31,6 @@ public class ExcelTemplateService {
         SHEET_COLUMNS.put(ImportSheetName.SECTIONS.sheetName(), new String[]{
                 "slug*", "name_pt*", "name_en*", "section_type*",
                 "description_pt", "description_en", "cover_image_url", "cover_video_url",
-                "display_variant", "layout_style", "show_intro", "show_gallery", "show_filters",
-                "show_item_details", "details_view_mode", "allow_custom_attributes",
                 "is_active", "sort_order"
         });
         SHEET_COLUMNS.put(ImportSheetName.CATEGORIES.sheetName(), new String[]{
@@ -110,6 +108,28 @@ public class ExcelTemplateService {
                         "Upload the file on the Import Data screen to preview it before committing."
                 });
         rowNum++;
+        rowNum = writeLegendBlock(sheet, rowNum, "What each column means",
+                new String[]{
+                        "slug / section_slug — the section's web address (letters, numbers, dashes), e.g. 'about-us'.",
+                        "  A section_slug column must match a slug from the Sections sheet.",
+                        "category_name_en — must match a name from the Categories sheet's name_en column.",
+                        "  Leave it blank if the section has no categories.",
+                        "name_pt/en, title_pt/en, label_pt/en — shown to visitors, in Portuguese / English.",
+                        "description_*, short_description_*, full_description_*, specifications_*, content_* — text",
+                        "  shown to visitors, in Portuguese / English. Optional.",
+                        "section_type — what kind of section this is; see the values below.",
+                        "block_type — what kind of content block this is; see the values below.",
+                        "type (Contact Methods sheet) — what kind of contact method; see the values below.",
+                        "cover_image_url, cover_video_url, image_url, video_url — leave these blank. After you upload",
+                        "  the file, pick the actual picture or video from the Gallery on the preview screen.",
+                        "is_active — true to make it visible on the live site, false to keep it hidden.",
+                        "is_featured — true to highlight it, false for normal.",
+                        "sort_order — a number; lower numbers appear first. Leave blank to add it at the end.",
+                        "item_type — a free-text label, e.g. banner, sign, printing service. Optional.",
+                        "icon_name — optional icon name, matched against the admin's icon picker.",
+                        "value (Contact Methods sheet) — the actual phone number, email address, or link."
+                });
+        rowNum++;
         rowNum = writeLegendBlock(sheet, rowNum, "section_type values",
                 enumNames(SectionType.values()));
         rowNum++;
@@ -119,7 +139,7 @@ public class ExcelTemplateService {
         writeLegendBlock(sheet, rowNum, "contact method type values",
                 enumNames(ContactMethodType.values()));
 
-        sheet.setColumnWidth(0, 90 * 256);
+        sheet.setColumnWidth(0, 100 * 256);
     }
 
     private String[] enumNames(Enum<?>[] values) {

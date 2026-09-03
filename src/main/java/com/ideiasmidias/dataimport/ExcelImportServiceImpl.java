@@ -115,14 +115,6 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             new ImportFieldMeta("description_en", "TEXT", false),
             new ImportFieldMeta("cover_image_url", "IMAGE", false),
             new ImportFieldMeta("cover_video_url", "VIDEO", false),
-            new ImportFieldMeta("display_variant", "TEXT", false),
-            new ImportFieldMeta("layout_style", "TEXT", false),
-            new ImportFieldMeta("show_intro", "BOOLEAN", false),
-            new ImportFieldMeta("show_gallery", "BOOLEAN", false),
-            new ImportFieldMeta("show_filters", "BOOLEAN", false),
-            new ImportFieldMeta("show_item_details", "BOOLEAN", false),
-            new ImportFieldMeta("details_view_mode", "TEXT", false),
-            new ImportFieldMeta("allow_custom_attributes", "BOOLEAN", false),
             new ImportFieldMeta("is_active", "BOOLEAN", false),
             new ImportFieldMeta("sort_order", "INTEGER", false)
     );
@@ -318,19 +310,6 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             String descriptionEn = effective(row, h, "description_en", sheetName, excelRowNumber, overrides);
             String coverImageUrl = effective(row, h, "cover_image_url", sheetName, excelRowNumber, overrides);
             String coverVideoUrl = effective(row, h, "cover_video_url", sheetName, excelRowNumber, overrides);
-            String displayVariant = effective(row, h, "display_variant", sheetName, excelRowNumber, overrides);
-            String layoutStyle = effective(row, h, "layout_style", sheetName, excelRowNumber, overrides);
-            String showIntroRaw = effective(row, h, "show_intro", sheetName, excelRowNumber, overrides);
-            Boolean showIntro = parseBool(showIntroRaw, "show_intro", true, rowErrors);
-            String showGalleryRaw = effective(row, h, "show_gallery", sheetName, excelRowNumber, overrides);
-            Boolean showGallery = parseBool(showGalleryRaw, "show_gallery", false, rowErrors);
-            String showFiltersRaw = effective(row, h, "show_filters", sheetName, excelRowNumber, overrides);
-            Boolean showFilters = parseBool(showFiltersRaw, "show_filters", false, rowErrors);
-            String showItemDetailsRaw = effective(row, h, "show_item_details", sheetName, excelRowNumber, overrides);
-            Boolean showItemDetails = parseBool(showItemDetailsRaw, "show_item_details", true, rowErrors);
-            String detailsViewMode = effective(row, h, "details_view_mode", sheetName, excelRowNumber, overrides);
-            String allowCustomAttributesRaw = effective(row, h, "allow_custom_attributes", sheetName, excelRowNumber, overrides);
-            Boolean allowCustomAttributes = parseBool(allowCustomAttributesRaw, "allow_custom_attributes", true, rowErrors);
             String isActiveRaw = effective(row, h, "is_active", sheetName, excelRowNumber, overrides);
             Boolean isActive = parseBool(isActiveRaw, "is_active", true, rowErrors);
             String sortOrderRaw = effective(row, h, "sort_order", sheetName, excelRowNumber, overrides);
@@ -359,14 +338,6 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             fields.put("description_en", nullToEmpty(descriptionEn));
             fields.put("cover_image_url", nullToEmpty(coverImageUrl));
             fields.put("cover_video_url", nullToEmpty(coverVideoUrl));
-            fields.put("display_variant", nullToEmpty(displayVariant));
-            fields.put("layout_style", nullToEmpty(layoutStyle));
-            fields.put("show_intro", nullToEmpty(showIntroRaw));
-            fields.put("show_gallery", nullToEmpty(showGalleryRaw));
-            fields.put("show_filters", nullToEmpty(showFiltersRaw));
-            fields.put("show_item_details", nullToEmpty(showItemDetailsRaw));
-            fields.put("details_view_mode", nullToEmpty(detailsViewMode));
-            fields.put("allow_custom_attributes", nullToEmpty(allowCustomAttributesRaw));
             fields.put("is_active", nullToEmpty(isActiveRaw));
             fields.put("sort_order", nullToEmpty(sortOrderRaw));
             rowSummaries.add(new ImportRowSummary(excelRowNumber, nameEn != null ? nameEn : slug, fields));
@@ -385,14 +356,6 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             request.setSectionType(sectionType);
             request.setCoverImageUrl(coverImageUrl);
             request.setCoverVideoUrl(coverVideoUrl);
-            request.setDisplayVariant(displayVariant);
-            request.setLayoutStyle(layoutStyle);
-            request.setShowIntro(showIntro);
-            request.setShowGallery(showGallery);
-            request.setShowFilters(showFilters);
-            request.setShowItemDetails(showItemDetails);
-            request.setDetailsViewMode(detailsViewMode);
-            request.setAllowCustomAttributes(allowCustomAttributes);
             request.setIsActive(isActive);
             request.setSortOrder(sortOrder);
 
