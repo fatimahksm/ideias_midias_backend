@@ -5,6 +5,7 @@ import com.ideiasmidias.common.response.ApiErrorResponse;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.AuthenticationException;
@@ -15,9 +16,15 @@ import java.io.IOException;
 import java.time.LocalDateTime;
 
 @Component
+@RequiredArgsConstructor
 public class RestAuthenticationEntryPoint implements AuthenticationEntryPoint {
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    // The app's own bean, not `new ObjectMapper()`: that default mapper has
+    // no JSR-310 module, so serializing this response's LocalDateTime
+    // timestamp used to blow up on every 401 — and since that happened
+    // mid-write, the response was left half-committed, which is what caused
+    // the cascading "response already closed" noise seen after it.
+    private final ObjectMapper objectMapper;
 
     @Override
     public void commence(
