@@ -2,6 +2,7 @@ package com.ideiasmidias.media.service;
 
 import com.ideiasmidias.common.enums.MediaType;
 
+import java.io.InputStream;
 import java.nio.file.Path;
 
 public interface MediaStorageService {
@@ -17,4 +18,11 @@ public interface MediaStorageService {
     StoredMediaFile storeGeneratedFile(Path filePath, String mimeType, MediaType mediaType);
 
     void deleteByFileUrl(String fileUrl);
+
+    /**
+     * Reads a previously stored file back, e.g. so the admin UI can re-crop
+     * an already-uploaded image without the browser fetching it directly
+     * (which would need CORS access to the storage bucket).
+     */
+    InputStream openStream(String fileUrl);
 }
