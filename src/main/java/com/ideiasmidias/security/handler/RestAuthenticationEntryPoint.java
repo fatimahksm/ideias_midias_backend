@@ -1,6 +1,5 @@
 package com.ideiasmidias.security.handler;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ideiasmidias.common.response.ApiErrorResponse;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -11,6 +10,7 @@ import org.springframework.http.MediaType;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.stereotype.Component;
+import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
@@ -19,11 +19,15 @@ import java.time.LocalDateTime;
 @RequiredArgsConstructor
 public class RestAuthenticationEntryPoint implements AuthenticationEntryPoint {
 
-    // The app's own bean, not `new ObjectMapper()`: that default mapper has
-    // no JSR-310 module, so serializing this response's LocalDateTime
-    // timestamp used to blow up on every 401 — and since that happened
-    // mid-write, the response was left half-committed, which is what caused
-    // the cascading "response already closed" noise seen after it.
+    // The app's own bean (Jackson 3's tools.jackson.databind.ObjectMapper —
+    // this Spring Boot 4 app serializes HTTP responses through Jackson 3,
+    // not the older com.fasterxml.jackson.databind.ObjectMapper that's only
+    // on the classpath as a transitive dependency of jjwt-jackson).
+    // `new ObjectMapper()` had no JSR-310 module, so serializing this
+    // response's LocalDateTime timestamp used to blow up on every 401 — and
+    // since that happened mid-write, the response was left half-committed,
+    // which is what caused the cascading "response already closed" noise
+    // seen after it.
     private final ObjectMapper objectMapper;
 
     @Override
