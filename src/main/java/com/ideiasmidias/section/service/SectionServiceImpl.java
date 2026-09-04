@@ -17,6 +17,7 @@ import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.text.Normalizer;
 import java.util.List;
 
 @Service
@@ -33,11 +34,11 @@ public class SectionServiceImpl implements SectionService {
 
     @Override
     public SectionResponse create(SectionRequest request) {
-        validateSlugUniqueness(request.getSlug(), null);
+        String slug = resolveSlug(request.getSlug(), request.getNameEn(), request.getNamePt(), null);
         validateSectionCompatibilityForType(request.getSectionType(), null);
 
         Section section = new Section();
-        applyRequestToEntity(section, request);
+        applyRequestToEntity(section, request, slug);
 
         Section saved = sectionRepository.save(section);
         return mapToResponse(saved);
@@ -47,9 +48,9 @@ public class SectionServiceImpl implements SectionService {
     public SectionResponse update(Long id, SectionRequest request) {
         Section section = getEntityById(id);
 
-        validateSlugUniqueness(request.getSlug(), id);
+        String slug = resolveSlug(request.getSlug(), request.getNameEn(), request.getNamePt(), id);
         validateSectionCompatibilityForType(request.getSectionType(), id);
-        applyRequestToEntity(section, request);
+        applyRequestToEntity(section, request, slug);
 
         Section saved = sectionRepository.save(section);
         return mapToResponse(saved);
@@ -147,8 +148,50 @@ public class SectionServiceImpl implements SectionService {
         });
     }
 
-    private void applyRequestToEntity(Section section, SectionRequest request) {
-        section.setSlug(normalizeSlug(request.getSlug()));
+    /**
+     * A slug the caller actually typed is validated as-is, so a real conflict
+     * surfaces immediately. A blank one is derived from the section's name
+     * and given a free "-2", "-3"... suffix on any collision, so neither the
+     * admin form nor the Excel import ever has to invent or type one.
+     */
+    private String resolveSlug(String rawSlug, String nameEn, String namePt, Long currentSectionId) {
+        String normalized = normalizeSlug(rawSlug);
+        if (normalized != null && !normalized.isEmpty()) {
+            validateSlugUniqueness(normalized, currentSectionId);
+            return normalized;
+        }
+        String base = slugify(nameEn != null && !nameEn.isBlank() ? nameEn : namePt);
+        return uniqueSlug(base, currentSectionId);
+    }
+
+    private String uniqueSlug(String base, Long currentSectionId) {
+        String candidate = base;
+        int suffix = 2;
+        while (isSlugTaken(candidate, currentSectionId)) {
+            candidate = base + "-" + suffix++;
+        }
+        return candidate;
+    }
+
+    private boolean isSlugTaken(String slug, Long currentSectionId) {
+        return sectionRepository.findBySlug(slug)
+                .filter(existing -> currentSectionId == null || !existing.getId().equals(currentSectionId))
+                .isPresent();
+    }
+
+    private String slugify(String text) {
+        if (text == null || text.isBlank()) {
+            return "section";
+        }
+        String withoutAccents = Normalizer.normalize(text, Normalizer.Form.NFD).replaceAll("\\p{M}", "");
+        String slug = withoutAccents.toLowerCase()
+                .replaceAll("[^a-z0-9]+", "-")
+                .replaceAll("(^-+)|(-+$)", "");
+        return slug.isEmpty() ? "section" : slug;
+    }
+
+    private void applyRequestToEntity(Section section, SectionRequest request, String slug) {
+        section.setSlug(slug);
         section.setNamePt(request.getNamePt());
         section.setNameEn(request.getNameEn());
         section.setDescriptionPt(request.getDescriptionPt());

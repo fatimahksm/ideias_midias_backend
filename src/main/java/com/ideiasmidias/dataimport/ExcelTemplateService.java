@@ -29,34 +29,34 @@ public class ExcelTemplateService {
 
     static {
         SHEET_COLUMNS.put(ImportSheetName.SECTIONS.sheetName(), new String[]{
-                "slug*", "name_pt*", "name_en*", "section_type*",
+                "name_pt*", "name_en*", "section_type*",
                 "description_pt", "description_en", "cover_image_url", "cover_video_url",
-                "is_active", "sort_order"
+                "is_active", "sort_order", "slug"
         });
         SHEET_COLUMNS.put(ImportSheetName.CATEGORIES.sheetName(), new String[]{
-                "section_slug*", "name_pt*", "name_en*",
+                "section_name_en*", "name_pt*", "name_en*",
                 "description_pt", "description_en", "is_active", "sort_order"
         });
         SHEET_COLUMNS.put(ImportSheetName.ITEMS.sheetName(), new String[]{
-                "section_slug*", "title_pt*", "title_en*",
+                "section_name_en*", "title_pt*", "title_en*",
                 "category_name_en", "short_description_pt", "short_description_en",
                 "full_description_pt", "full_description_en", "cover_image_url", "video_url",
                 "item_type", "specifications_pt", "specifications_en",
                 "is_featured", "is_active", "sort_order"
         });
         SHEET_COLUMNS.put(ImportSheetName.PORTFOLIO_PROJECTS.sheetName(), new String[]{
-                "section_slug*", "title_pt*", "title_en*",
+                "section_name_en*", "title_pt*", "title_en*",
                 "short_description_pt", "short_description_en", "full_description_pt", "full_description_en",
                 "client_name", "project_date", "location_pt", "location_en",
                 "cover_image_url", "video_url", "is_featured", "is_active", "sort_order"
         });
         SHEET_COLUMNS.put(ImportSheetName.CONTENT_BLOCKS.sheetName(), new String[]{
-                "section_slug*", "block_type*",
+                "section_name_en*", "block_type*",
                 "title_pt", "title_en", "subtitle_pt", "subtitle_en", "content_pt", "content_en",
                 "image_url", "video_url", "is_active", "sort_order"
         });
         SHEET_COLUMNS.put(ImportSheetName.HOME_CARDS.sheetName(), new String[]{
-                "section_slug*", "title_pt*", "title_en*",
+                "section_name_en*", "title_pt*", "title_en*",
                 "short_description_pt", "short_description_en", "image_url", "icon_name",
                 "is_active", "sort_order"
         });
@@ -101,7 +101,7 @@ public class ExcelTemplateService {
                 new String[]{
                         "Fill in only the sheets you need — an empty or missing sheet is skipped.",
                         "Columns marked with * are required.",
-                        "section_slug, category_name_en etc. must match a row from the Sections/Categories sheet",
+                        "section_name_en, category_name_en etc. must match a row from the Sections/Categories sheet",
                         "(either already in the site, or added earlier in this same file).",
                         "true/false columns also accept yes/no, sim/nao, 1/0.",
                         "Dates use the YYYY-MM-DD format, e.g. 2026-09-03.",
@@ -110,8 +110,10 @@ public class ExcelTemplateService {
         rowNum++;
         rowNum = writeLegendBlock(sheet, rowNum, "What each column means",
                 new String[]{
-                        "slug / section_slug — the section's web address (letters, numbers, dashes), e.g. 'about-us'.",
-                        "  A section_slug column must match a slug from the Sections sheet.",
+                        "section_name_en (on Categories/Items/Portfolio/Content Blocks/Home Cards) — must match",
+                        "  a name_en value from the Sections sheet (either already in the site, or added above).",
+                        "slug (Sections sheet) — leave it blank; the site generates it automatically from name_en.",
+                        "  Only fill it in if you want to force a specific web address.",
                         "category_name_en — must match a name from the Categories sheet's name_en column.",
                         "  Leave it blank if the section has no categories.",
                         "name_pt/en, title_pt/en, label_pt/en — shown to visitors, in Portuguese / English.",
