@@ -39,6 +39,7 @@ import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -204,12 +205,20 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             new ImportFieldMeta("sort_order", "INTEGER", false)
     );
 
+    // Every lookup below (sections, categories, and each sheet's own
+    // resolution against them) reads lazy associations like
+    // Category.getSection(), which needs a live Hibernate session for the
+    // whole call — without a transaction here, each repository call opens
+    // and closes its own, and the next lazy access blows up with
+    // LazyInitializationException.
     @Override
+    @Transactional(readOnly = true)
     public ImportSummaryResponse preview(MultipartFile file, String fieldOverridesJson) throws IOException {
         return run(file, true, fieldOverridesJson);
     }
 
     @Override
+    @Transactional
     public ImportSummaryResponse commit(MultipartFile file, String fieldOverridesJson) throws IOException {
         return run(file, false, fieldOverridesJson);
     }
