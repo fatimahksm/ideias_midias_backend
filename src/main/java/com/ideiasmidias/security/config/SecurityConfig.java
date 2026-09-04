@@ -60,6 +60,15 @@ public class SecurityConfig {
                         // briefly. Leaving Security's writer on would overwrite
                         // that with no-store for everything.
                         .cacheControl(cache -> cache.disable())
+                        // Tell browsers to only ever reach this API over HTTPS.
+                        // Spring adds this by default only when it believes the
+                        // request arrived over HTTPS, which behind a
+                        // TLS-terminating proxy it does not — hence
+                        // server.forward-headers-strategy alongside this.
+                        .httpStrictTransportSecurity(hsts -> hsts
+                                .includeSubDomains(true)
+                                .maxAgeInSeconds(31536000)
+                        )
                 )
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
