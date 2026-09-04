@@ -11,7 +11,8 @@ import lombok.Setter;
 @Setter
 public class SectionRequest {
 
-    @NotBlank(message = "Section slug is required")
+    // Optional: left blank, the backend derives it from the section name and
+    // guarantees uniqueness itself (see SectionServiceImpl#resolveSlug).
     @Size(max = 180, message = "Section slug must not exceed 180 characters")
     private String slug;
 

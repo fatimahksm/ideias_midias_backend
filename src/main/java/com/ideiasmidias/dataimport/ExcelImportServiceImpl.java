@@ -64,7 +64,7 @@ import java.util.Map;
  * duplicating them here.
  *
  * <p>Sheets are processed in dependency order. Foreign keys are written as
- * human-readable references (a section slug, a category name) rather than
+ * human-readable references (a section's name_en, a category name) rather than
  * raw ids, and are resolved against a registry that starts out pre-loaded
  * with everything already in the database and is extended as each sheet's
  * rows are created — so a single workbook can reference a section created a
@@ -74,7 +74,7 @@ import java.util.Map;
  * the admin already applied from the preview UI) is echoed back on
  * {@link ImportRowSummary#fields()}, and every sheet carries its own column
  * schema ({@link ImportSheetResult#fieldsMeta()}) and, for the fields that
- * must reference another row (a section slug, a category name) or a fixed
+ * must reference another row (a section's name_en, a category name) or a fixed
  * enum, the valid choices ({@link ImportSheetResult#fieldOptions()}) — so the
  * admin UI can render a fully editable, dropdown-backed table instead of
  * sending the admin back to the spreadsheet to fix a typo.
@@ -108,7 +108,6 @@ public class ExcelImportServiceImpl implements ExcelImportService {
     }
 
     private static final List<ImportFieldMeta> SECTIONS_META = List.of(
-            new ImportFieldMeta("slug", "TEXT", true),
             new ImportFieldMeta("name_pt", "TEXT", true),
             new ImportFieldMeta("name_en", "TEXT", true),
             new ImportFieldMeta("section_type", "SELECT", true),
@@ -117,11 +116,13 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             new ImportFieldMeta("cover_image_url", "IMAGE", false),
             new ImportFieldMeta("cover_video_url", "VIDEO", false),
             new ImportFieldMeta("is_active", "BOOLEAN", false),
-            new ImportFieldMeta("sort_order", "INTEGER", false)
+            new ImportFieldMeta("sort_order", "INTEGER", false),
+            // Left blank, the backend derives a unique slug from name_en on its own.
+            new ImportFieldMeta("slug", "TEXT", false)
     );
 
     private static final List<ImportFieldMeta> CATEGORIES_META = List.of(
-            new ImportFieldMeta("section_slug", "SELECT", true),
+            new ImportFieldMeta("section_name_en", "SELECT", true),
             new ImportFieldMeta("name_pt", "TEXT", true),
             new ImportFieldMeta("name_en", "TEXT", true),
             new ImportFieldMeta("description_pt", "TEXT", false),
@@ -131,7 +132,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
     );
 
     private static final List<ImportFieldMeta> ITEMS_META = List.of(
-            new ImportFieldMeta("section_slug", "SELECT", true),
+            new ImportFieldMeta("section_name_en", "SELECT", true),
             new ImportFieldMeta("category_name_en", "SELECT", false),
             new ImportFieldMeta("title_pt", "TEXT", true),
             new ImportFieldMeta("title_en", "TEXT", true),
@@ -150,7 +151,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
     );
 
     private static final List<ImportFieldMeta> PORTFOLIO_PROJECTS_META = List.of(
-            new ImportFieldMeta("section_slug", "SELECT", true),
+            new ImportFieldMeta("section_name_en", "SELECT", true),
             new ImportFieldMeta("title_pt", "TEXT", true),
             new ImportFieldMeta("title_en", "TEXT", true),
             new ImportFieldMeta("short_description_pt", "TEXT", false),
@@ -169,7 +170,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
     );
 
     private static final List<ImportFieldMeta> CONTENT_BLOCKS_META = List.of(
-            new ImportFieldMeta("section_slug", "SELECT", true),
+            new ImportFieldMeta("section_name_en", "SELECT", true),
             new ImportFieldMeta("block_type", "SELECT", true),
             new ImportFieldMeta("title_pt", "TEXT", false),
             new ImportFieldMeta("title_en", "TEXT", false),
@@ -184,7 +185,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
     );
 
     private static final List<ImportFieldMeta> HOME_CARDS_META = List.of(
-            new ImportFieldMeta("section_slug", "SELECT", true),
+            new ImportFieldMeta("section_name_en", "SELECT", true),
             new ImportFieldMeta("title_pt", "TEXT", true),
             new ImportFieldMeta("title_en", "TEXT", true),
             new ImportFieldMeta("short_description_pt", "TEXT", false),
@@ -227,29 +228,30 @@ public class ExcelImportServiceImpl implements ExcelImportService {
         Map<String, String> overrides = parseOverrides(fieldOverridesJson);
 
         try (Workbook workbook = WorkbookFactory.create(file.getInputStream())) {
-            Map<String, Long> sectionIdBySlug = new HashMap<>();
+            // Sections are referenced by name_en rather than slug: slug is now an
+            // internal, backend-generated detail nobody has to type into a sheet.
+            Map<String, Long> sectionIdByNameEn = new HashMap<>();
             List<ImportFieldOption> sectionOptions = new ArrayList<>();
             for (Section section : sectionRepository.findAll()) {
-                String slug = section.getSlug().trim().toLowerCase();
-                sectionIdBySlug.put(slug, section.getId());
-                sectionOptions.add(new ImportFieldOption(slug, section.getNameEn() + " (" + slug + ")"));
+                sectionIdByNameEn.put(section.getNameEn().trim().toLowerCase(), section.getId());
+                sectionOptions.add(new ImportFieldOption(section.getNameEn(), section.getNameEn()));
             }
 
             Map<String, Long> categoryIdByKey = new HashMap<>();
             List<ImportFieldOption> categoryOptions = new ArrayList<>();
             for (SectionCategory category : sectionCategoryRepository.findAll()) {
                 categoryIdByKey.put(categoryKey(category.getSection().getId(), category.getNameEn()), category.getId());
-                String sectionSlug = category.getSection().getSlug().trim().toLowerCase();
-                categoryOptions.add(new ImportFieldOption(category.getNameEn(), category.getNameEn(), sectionSlug));
+                String sectionNameEn = category.getSection().getNameEn().trim().toLowerCase();
+                categoryOptions.add(new ImportFieldOption(category.getNameEn(), category.getNameEn(), sectionNameEn));
             }
 
             List<ImportSheetResult> results = new ArrayList<>();
-            results.add(processSections(workbook, dryRun, sectionIdBySlug, overrides, sectionOptions));
-            results.add(processCategories(workbook, dryRun, sectionIdBySlug, categoryIdByKey, overrides, sectionOptions, categoryOptions));
-            results.add(processItems(workbook, dryRun, sectionIdBySlug, categoryIdByKey, overrides, sectionOptions, categoryOptions));
-            results.add(processPortfolioProjects(workbook, dryRun, sectionIdBySlug, overrides, sectionOptions));
-            results.add(processContentBlocks(workbook, dryRun, sectionIdBySlug, overrides, sectionOptions));
-            results.add(processHomeCards(workbook, dryRun, sectionIdBySlug, overrides, sectionOptions));
+            results.add(processSections(workbook, dryRun, sectionIdByNameEn, overrides, sectionOptions));
+            results.add(processCategories(workbook, dryRun, sectionIdByNameEn, categoryIdByKey, overrides, sectionOptions, categoryOptions));
+            results.add(processItems(workbook, dryRun, sectionIdByNameEn, categoryIdByKey, overrides, sectionOptions, categoryOptions));
+            results.add(processPortfolioProjects(workbook, dryRun, sectionIdByNameEn, overrides, sectionOptions));
+            results.add(processContentBlocks(workbook, dryRun, sectionIdByNameEn, overrides, sectionOptions));
+            results.add(processHomeCards(workbook, dryRun, sectionIdByNameEn, overrides, sectionOptions));
             results.add(processContactMethods(workbook, dryRun, overrides));
 
             return new ImportSummaryResponse(!dryRun, results);
@@ -285,7 +287,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
 
     private ImportSheetResult processSections(
             Workbook workbook, boolean dryRun,
-            Map<String, Long> sectionIdBySlug, Map<String, String> overrides,
+            Map<String, Long> sectionIdByNameEn, Map<String, String> overrides,
             List<ImportFieldOption> sectionOptions
     ) {
         String sheetName = ImportSheetName.SECTIONS.sheetName();
@@ -324,9 +326,6 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             String sortOrderRaw = effective(row, h, "sort_order", sheetName, excelRowNumber, overrides);
             Integer sortOrder = parseInt(sortOrderRaw, "sort_order", 0, rowErrors);
 
-            if (slug == null) {
-                rowErrors.add("slug is required");
-            }
             if (namePt == null) {
                 rowErrors.add("name_pt is required");
             }
@@ -334,8 +333,9 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                 rowErrors.add("name_en is required");
             }
             String normalizedSlug = slug == null ? null : slug.trim().toLowerCase();
-            if (normalizedSlug != null && sectionIdBySlug.containsKey(normalizedSlug)) {
-                rowErrors.add("slug '" + slug + "' is already used by another section");
+            String normalizedNameEn = nameEn == null ? null : nameEn.trim().toLowerCase();
+            if (normalizedNameEn != null && sectionIdByNameEn.containsKey(normalizedNameEn)) {
+                rowErrors.add("a section named '" + nameEn + "' already exists");
             }
 
             Map<String, String> fields = new LinkedHashMap<>();
@@ -370,8 +370,8 @@ public class ExcelImportServiceImpl implements ExcelImportService {
 
             try {
                 Long id = dryRun ? placeholderId-- : sectionService.create(request).getId();
-                sectionIdBySlug.put(normalizedSlug, id);
-                sectionOptions.add(new ImportFieldOption(normalizedSlug, nameEn + " (" + normalizedSlug + ")"));
+                sectionIdByNameEn.put(normalizedNameEn, id);
+                sectionOptions.add(new ImportFieldOption(nameEn, nameEn));
                 succeeded++;
             } catch (RuntimeException e) {
                 errors.add(new ImportRowError(excelRowNumber, e.getMessage()));
@@ -386,14 +386,14 @@ public class ExcelImportServiceImpl implements ExcelImportService {
 
     private ImportSheetResult processCategories(
             Workbook workbook, boolean dryRun,
-            Map<String, Long> sectionIdBySlug, Map<String, Long> categoryIdByKey,
+            Map<String, Long> sectionIdByNameEn, Map<String, Long> categoryIdByKey,
             Map<String, String> overrides,
             List<ImportFieldOption> sectionOptions, List<ImportFieldOption> categoryOptions
     ) {
         String sheetName = ImportSheetName.CATEGORIES.sheetName();
         Sheet sheet = workbook.getSheet(sheetName);
         if (sheet == null) {
-            return notPresent(sheetName, CATEGORIES_META, Map.of("section_slug", sectionOptions));
+            return notPresent(sheetName, CATEGORIES_META, Map.of("section_name_en", sectionOptions));
         }
 
         Map<String, Integer> h = headerIndex(sheet);
@@ -412,7 +412,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             int excelRowNumber = r + 1;
             List<String> rowErrors = new ArrayList<>();
 
-            String sectionSlug = effective(row, h, "section_slug", sheetName, excelRowNumber, overrides);
+            String sectionNameEn = effective(row, h, "section_name_en", sheetName, excelRowNumber, overrides);
             String namePt = effective(row, h, "name_pt", sheetName, excelRowNumber, overrides);
             String nameEn = effective(row, h, "name_en", sheetName, excelRowNumber, overrides);
             String descriptionPt = effective(row, h, "description_pt", sheetName, excelRowNumber, overrides);
@@ -422,7 +422,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             String sortOrderRaw = effective(row, h, "sort_order", sheetName, excelRowNumber, overrides);
             Integer sortOrder = parseInt(sortOrderRaw, "sort_order", 0, rowErrors);
 
-            Long sectionId = resolveSectionId(sectionSlug, sectionIdBySlug, rowErrors);
+            Long sectionId = resolveSectionId(sectionNameEn, sectionIdByNameEn, rowErrors);
             if (namePt == null) {
                 rowErrors.add("name_pt is required");
             }
@@ -431,7 +431,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             }
 
             Map<String, String> fields = new LinkedHashMap<>();
-            fields.put("section_slug", nullToEmpty(sectionSlug));
+            fields.put("section_name_en", nullToEmpty(sectionNameEn));
             fields.put("name_pt", nullToEmpty(namePt));
             fields.put("name_en", nullToEmpty(nameEn));
             fields.put("description_pt", nullToEmpty(descriptionPt));
@@ -457,7 +457,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             try {
                 Long id = dryRun ? placeholderId-- : sectionCategoryService.create(request).getId();
                 categoryIdByKey.put(categoryKey(sectionId, nameEn), id);
-                categoryOptions.add(new ImportFieldOption(nameEn, nameEn, sectionSlug.trim().toLowerCase()));
+                categoryOptions.add(new ImportFieldOption(nameEn, nameEn, sectionNameEn.trim().toLowerCase()));
                 succeeded++;
             } catch (RuntimeException e) {
                 errors.add(new ImportRowError(excelRowNumber, e.getMessage()));
@@ -465,21 +465,21 @@ public class ExcelImportServiceImpl implements ExcelImportService {
         }
 
         return new ImportSheetResult(sheetName, true, total, succeeded, errors, rowSummaries,
-                CATEGORIES_META, Map.of("section_slug", sectionOptions));
+                CATEGORIES_META, Map.of("section_name_en", sectionOptions));
     }
 
     // ------------------------------------------------------------------ Items
 
     private ImportSheetResult processItems(
             Workbook workbook, boolean dryRun,
-            Map<String, Long> sectionIdBySlug, Map<String, Long> categoryIdByKey, Map<String, String> overrides,
+            Map<String, Long> sectionIdByNameEn, Map<String, Long> categoryIdByKey, Map<String, String> overrides,
             List<ImportFieldOption> sectionOptions, List<ImportFieldOption> categoryOptions
     ) {
         String sheetName = ImportSheetName.ITEMS.sheetName();
         Sheet sheet = workbook.getSheet(sheetName);
         if (sheet == null) {
             return notPresent(sheetName, ITEMS_META,
-                    Map.of("section_slug", sectionOptions, "category_name_en", categoryOptions));
+                    Map.of("section_name_en", sectionOptions, "category_name_en", categoryOptions));
         }
 
         Map<String, Integer> h = headerIndex(sheet);
@@ -497,7 +497,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             int excelRowNumber = r + 1;
             List<String> rowErrors = new ArrayList<>();
 
-            String sectionSlug = effective(row, h, "section_slug", sheetName, excelRowNumber, overrides);
+            String sectionNameEn = effective(row, h, "section_name_en", sheetName, excelRowNumber, overrides);
             String categoryNameEn = effective(row, h, "category_name_en", sheetName, excelRowNumber, overrides);
             String titlePt = effective(row, h, "title_pt", sheetName, excelRowNumber, overrides);
             String titleEn = effective(row, h, "title_en", sheetName, excelRowNumber, overrides);
@@ -517,7 +517,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             String sortOrderRaw = effective(row, h, "sort_order", sheetName, excelRowNumber, overrides);
             Integer sortOrder = parseInt(sortOrderRaw, "sort_order", 0, rowErrors);
 
-            Long sectionId = resolveSectionId(sectionSlug, sectionIdBySlug, rowErrors);
+            Long sectionId = resolveSectionId(sectionNameEn, sectionIdByNameEn, rowErrors);
             Long categoryId = resolveCategoryId(categoryNameEn, sectionId, categoryIdByKey, rowErrors);
             if (titlePt == null) {
                 rowErrors.add("title_pt is required");
@@ -527,7 +527,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             }
 
             Map<String, String> fields = new LinkedHashMap<>();
-            fields.put("section_slug", nullToEmpty(sectionSlug));
+            fields.put("section_name_en", nullToEmpty(sectionNameEn));
             fields.put("category_name_en", nullToEmpty(categoryNameEn));
             fields.put("title_pt", nullToEmpty(titlePt));
             fields.put("title_en", nullToEmpty(titleEn));
@@ -579,19 +579,19 @@ public class ExcelImportServiceImpl implements ExcelImportService {
         }
 
         return new ImportSheetResult(sheetName, true, total, succeeded, errors, rowSummaries,
-                ITEMS_META, Map.of("section_slug", sectionOptions, "category_name_en", categoryOptions));
+                ITEMS_META, Map.of("section_name_en", sectionOptions, "category_name_en", categoryOptions));
     }
 
     // -------------------------------------------------------- PortfolioProjects
 
     private ImportSheetResult processPortfolioProjects(
-            Workbook workbook, boolean dryRun, Map<String, Long> sectionIdBySlug, Map<String, String> overrides,
+            Workbook workbook, boolean dryRun, Map<String, Long> sectionIdByNameEn, Map<String, String> overrides,
             List<ImportFieldOption> sectionOptions
     ) {
         String sheetName = ImportSheetName.PORTFOLIO_PROJECTS.sheetName();
         Sheet sheet = workbook.getSheet(sheetName);
         if (sheet == null) {
-            return notPresent(sheetName, PORTFOLIO_PROJECTS_META, Map.of("section_slug", sectionOptions));
+            return notPresent(sheetName, PORTFOLIO_PROJECTS_META, Map.of("section_name_en", sectionOptions));
         }
 
         Map<String, Integer> h = headerIndex(sheet);
@@ -609,7 +609,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             int excelRowNumber = r + 1;
             List<String> rowErrors = new ArrayList<>();
 
-            String sectionSlug = effective(row, h, "section_slug", sheetName, excelRowNumber, overrides);
+            String sectionNameEn = effective(row, h, "section_name_en", sheetName, excelRowNumber, overrides);
             String titlePt = effective(row, h, "title_pt", sheetName, excelRowNumber, overrides);
             String titleEn = effective(row, h, "title_en", sheetName, excelRowNumber, overrides);
             String shortDescriptionPt = effective(row, h, "short_description_pt", sheetName, excelRowNumber, overrides);
@@ -630,7 +630,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             String sortOrderRaw = effective(row, h, "sort_order", sheetName, excelRowNumber, overrides);
             Integer sortOrder = parseInt(sortOrderRaw, "sort_order", 0, rowErrors);
 
-            Long sectionId = resolveSectionId(sectionSlug, sectionIdBySlug, rowErrors);
+            Long sectionId = resolveSectionId(sectionNameEn, sectionIdByNameEn, rowErrors);
             if (titlePt == null) {
                 rowErrors.add("title_pt is required");
             }
@@ -639,7 +639,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             }
 
             Map<String, String> fields = new LinkedHashMap<>();
-            fields.put("section_slug", nullToEmpty(sectionSlug));
+            fields.put("section_name_en", nullToEmpty(sectionNameEn));
             fields.put("title_pt", nullToEmpty(titlePt));
             fields.put("title_en", nullToEmpty(titleEn));
             fields.put("short_description_pt", nullToEmpty(shortDescriptionPt));
@@ -691,20 +691,20 @@ public class ExcelImportServiceImpl implements ExcelImportService {
         }
 
         return new ImportSheetResult(sheetName, true, total, succeeded, errors, rowSummaries,
-                PORTFOLIO_PROJECTS_META, Map.of("section_slug", sectionOptions));
+                PORTFOLIO_PROJECTS_META, Map.of("section_name_en", sectionOptions));
     }
 
     // ----------------------------------------------------------- ContentBlocks
 
     private ImportSheetResult processContentBlocks(
-            Workbook workbook, boolean dryRun, Map<String, Long> sectionIdBySlug, Map<String, String> overrides,
+            Workbook workbook, boolean dryRun, Map<String, Long> sectionIdByNameEn, Map<String, String> overrides,
             List<ImportFieldOption> sectionOptions
     ) {
         String sheetName = ImportSheetName.CONTENT_BLOCKS.sheetName();
         Sheet sheet = workbook.getSheet(sheetName);
         if (sheet == null) {
             return notPresent(sheetName, CONTENT_BLOCKS_META,
-                    Map.of("section_slug", sectionOptions, "block_type", CONTENT_BLOCK_TYPE_OPTIONS));
+                    Map.of("section_name_en", sectionOptions, "block_type", CONTENT_BLOCK_TYPE_OPTIONS));
         }
 
         Map<String, Integer> h = headerIndex(sheet);
@@ -722,7 +722,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             int excelRowNumber = r + 1;
             List<String> rowErrors = new ArrayList<>();
 
-            String sectionSlug = effective(row, h, "section_slug", sheetName, excelRowNumber, overrides);
+            String sectionNameEn = effective(row, h, "section_name_en", sheetName, excelRowNumber, overrides);
             String blockTypeRaw = effective(row, h, "block_type", sheetName, excelRowNumber, overrides);
             ContentBlockType blockType = parseEnum(ContentBlockType.class, blockTypeRaw, "block_type", rowErrors);
             String titlePt = effective(row, h, "title_pt", sheetName, excelRowNumber, overrides);
@@ -738,13 +738,13 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             String sortOrderRaw = effective(row, h, "sort_order", sheetName, excelRowNumber, overrides);
             Integer sortOrder = parseInt(sortOrderRaw, "sort_order", 0, rowErrors);
 
-            Long sectionId = resolveSectionId(sectionSlug, sectionIdBySlug, rowErrors);
+            Long sectionId = resolveSectionId(sectionNameEn, sectionIdByNameEn, rowErrors);
 
             String label = titleEn != null ? titleEn
                     : (blockType != null ? blockType.name() + " (row " + excelRowNumber + ")" : "Row " + excelRowNumber);
 
             Map<String, String> fields = new LinkedHashMap<>();
-            fields.put("section_slug", nullToEmpty(sectionSlug));
+            fields.put("section_name_en", nullToEmpty(sectionNameEn));
             fields.put("block_type", nullToEmpty(blockTypeRaw));
             fields.put("title_pt", nullToEmpty(titlePt));
             fields.put("title_en", nullToEmpty(titleEn));
@@ -788,19 +788,19 @@ public class ExcelImportServiceImpl implements ExcelImportService {
         }
 
         return new ImportSheetResult(sheetName, true, total, succeeded, errors, rowSummaries,
-                CONTENT_BLOCKS_META, Map.of("section_slug", sectionOptions, "block_type", CONTENT_BLOCK_TYPE_OPTIONS));
+                CONTENT_BLOCKS_META, Map.of("section_name_en", sectionOptions, "block_type", CONTENT_BLOCK_TYPE_OPTIONS));
     }
 
     // --------------------------------------------------------------- HomeCards
 
     private ImportSheetResult processHomeCards(
-            Workbook workbook, boolean dryRun, Map<String, Long> sectionIdBySlug, Map<String, String> overrides,
+            Workbook workbook, boolean dryRun, Map<String, Long> sectionIdByNameEn, Map<String, String> overrides,
             List<ImportFieldOption> sectionOptions
     ) {
         String sheetName = ImportSheetName.HOME_CARDS.sheetName();
         Sheet sheet = workbook.getSheet(sheetName);
         if (sheet == null) {
-            return notPresent(sheetName, HOME_CARDS_META, Map.of("section_slug", sectionOptions));
+            return notPresent(sheetName, HOME_CARDS_META, Map.of("section_name_en", sectionOptions));
         }
 
         Map<String, Integer> h = headerIndex(sheet);
@@ -818,7 +818,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             int excelRowNumber = r + 1;
             List<String> rowErrors = new ArrayList<>();
 
-            String sectionSlug = effective(row, h, "section_slug", sheetName, excelRowNumber, overrides);
+            String sectionNameEn = effective(row, h, "section_name_en", sheetName, excelRowNumber, overrides);
             String titlePt = effective(row, h, "title_pt", sheetName, excelRowNumber, overrides);
             String titleEn = effective(row, h, "title_en", sheetName, excelRowNumber, overrides);
             String shortDescriptionPt = effective(row, h, "short_description_pt", sheetName, excelRowNumber, overrides);
@@ -830,7 +830,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             String sortOrderRaw = effective(row, h, "sort_order", sheetName, excelRowNumber, overrides);
             Integer sortOrder = parseInt(sortOrderRaw, "sort_order", 0, rowErrors);
 
-            Long sectionId = resolveSectionId(sectionSlug, sectionIdBySlug, rowErrors);
+            Long sectionId = resolveSectionId(sectionNameEn, sectionIdByNameEn, rowErrors);
             if (titlePt == null) {
                 rowErrors.add("title_pt is required");
             }
@@ -839,7 +839,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             }
 
             Map<String, String> fields = new LinkedHashMap<>();
-            fields.put("section_slug", nullToEmpty(sectionSlug));
+            fields.put("section_name_en", nullToEmpty(sectionNameEn));
             fields.put("title_pt", nullToEmpty(titlePt));
             fields.put("title_en", nullToEmpty(titleEn));
             fields.put("short_description_pt", nullToEmpty(shortDescriptionPt));
@@ -877,7 +877,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
         }
 
         return new ImportSheetResult(sheetName, true, total, succeeded, errors, rowSummaries,
-                HOME_CARDS_META, Map.of("section_slug", sectionOptions));
+                HOME_CARDS_META, Map.of("section_name_en", sectionOptions));
     }
 
     // ---------------------------------------------------------- ContactMethods
@@ -963,15 +963,15 @@ public class ExcelImportServiceImpl implements ExcelImportService {
         return sectionId + "::" + nameEn.trim().toLowerCase();
     }
 
-    private Long resolveSectionId(String slugRaw, Map<String, Long> sectionIdBySlug, List<String> rowErrors) {
-        if (slugRaw == null) {
-            rowErrors.add("section_slug is required");
+    private Long resolveSectionId(String nameEnRaw, Map<String, Long> sectionIdByNameEn, List<String> rowErrors) {
+        if (nameEnRaw == null) {
+            rowErrors.add("section_name_en is required");
             return null;
         }
-        Long id = sectionIdBySlug.get(slugRaw.trim().toLowerCase());
+        Long id = sectionIdByNameEn.get(nameEnRaw.trim().toLowerCase());
         if (id == null) {
-            rowErrors.add("no section found with slug '" + slugRaw
-                    + "' (add it to the Sections sheet, or use an existing slug)");
+            rowErrors.add("no section found named '" + nameEnRaw
+                    + "' (add it to the Sections sheet, or use an existing section's name_en)");
         }
         return id;
     }
