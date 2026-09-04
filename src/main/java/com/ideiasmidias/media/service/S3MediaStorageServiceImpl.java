@@ -12,9 +12,11 @@ import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -131,6 +133,16 @@ public class S3MediaStorageServiceImpl implements MediaStorageService {
         }
 
         s3Client.deleteObject(DeleteObjectRequest.builder()
+                .bucket(bucket)
+                .key(key)
+                .build());
+    }
+
+    @Override
+    public InputStream openStream(String fileUrl) {
+        String key = extractKey(fileUrl);
+
+        return s3Client.getObject(GetObjectRequest.builder()
                 .bucket(bucket)
                 .key(key)
                 .build());

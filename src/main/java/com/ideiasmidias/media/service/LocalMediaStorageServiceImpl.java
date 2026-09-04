@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -104,8 +105,35 @@ public class LocalMediaStorageServiceImpl implements MediaStorageService {
 
     @Override
     public void deleteByFileUrl(String fileUrl) {
-        if (fileUrl == null || fileUrl.isBlank()) {
+        Path targetPath = resolveStoredPath(fileUrl);
+        if (targetPath == null) {
             return;
+        }
+
+        try {
+            Files.deleteIfExists(targetPath);
+        } catch (IOException ex) {
+            throw new RuntimeException("Failed to delete stored file", ex);
+        }
+    }
+
+    @Override
+    public InputStream openStream(String fileUrl) {
+        Path targetPath = resolveStoredPath(fileUrl);
+        if (targetPath == null) {
+            throw new BadRequestException("Invalid file path");
+        }
+
+        try {
+            return Files.newInputStream(targetPath);
+        } catch (IOException ex) {
+            throw new RuntimeException("Failed to read stored file", ex);
+        }
+    }
+
+    private Path resolveStoredPath(String fileUrl) {
+        if (fileUrl == null || fileUrl.isBlank()) {
+            return null;
         }
 
         String pathValue = fileUrl;
@@ -119,26 +147,22 @@ public class LocalMediaStorageServiceImpl implements MediaStorageService {
 
         Path fileNamePath = Paths.get(pathValue).getFileName();
         if (fileNamePath == null) {
-            return;
+            return null;
         }
 
         String fileName = fileNamePath.toString();
         if (fileName.isBlank()) {
-            return;
+            return null;
         }
 
         Path uploadPath = getUploadPath();
         Path targetPath = uploadPath.resolve(fileName).normalize();
 
         if (!targetPath.startsWith(uploadPath)) {
-            return;
+            return null;
         }
 
-        try {
-            Files.deleteIfExists(targetPath);
-        } catch (IOException ex) {
-            throw new RuntimeException("Failed to delete stored file", ex);
-        }
+        return targetPath;
     }
 
     private Path getUploadPath() {

@@ -6,8 +6,11 @@ import com.ideiasmidias.common.response.ApiResponse;
 import com.ideiasmidias.common.response.PageResponse;
 import com.ideiasmidias.media.dto.MediaLibraryResponse;
 import com.ideiasmidias.media.service.MediaLibraryService;
+import com.ideiasmidias.media.service.MediaStorageService;
 import com.ideiasmidias.security.model.AdminUserPrincipal;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.InputStreamResource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -23,6 +26,7 @@ import java.util.List;
 public class MediaLibraryController {
 
     private final MediaLibraryService mediaLibraryService;
+    private final MediaStorageService mediaStorageService;
 
     @PostMapping(
             value = "/upload",
@@ -64,6 +68,33 @@ public class MediaLibraryController {
                         .data(response)
                         .build()
         );
+    }
+
+    /**
+     * Streams the file's own bytes back through our origin, authenticated
+     * the same way as every other admin call. Used by the crop tool so it
+     * can re-read an already-uploaded image without the browser needing
+     * direct (and CORS-enabled) access to wherever it's actually stored.
+     */
+    @GetMapping("/{id}/raw")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    public ResponseEntity<InputStreamResource> getRaw(
+            @PathVariable Long id,
+            @AuthenticationPrincipal AdminUserPrincipal principal
+    ) {
+        AdminUserPrincipal currentAdmin = requirePrincipal(principal);
+
+        MediaLibraryResponse media = mediaLibraryService.getById(id);
+        ensureCanAccessMedia(currentAdmin, media);
+
+        InputStreamResource body = new InputStreamResource(
+                mediaStorageService.openStream(media.getFileUrl())
+        );
+
+        return ResponseEntity.ok()
+                .contentType(org.springframework.http.MediaType.parseMediaType(media.getMimeType()))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + media.getFileName() + "\"")
+                .body(body);
     }
 
     @GetMapping
