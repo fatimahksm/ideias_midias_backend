@@ -78,4 +78,19 @@ public class SiteSettings extends BaseEntity {
 
     @Column(name = "location_lng", precision = 10, scale = 7)
     private BigDecimal locationLng;
+
+    @Column(name = "address2_pt", columnDefinition = "TEXT")
+    private String address2Pt;
+
+    @Column(name = "address2_en", columnDefinition = "TEXT")
+    private String address2En;
+
+    @Column(name = "map_embed_url2", columnDefinition = "TEXT")
+    private String mapEmbedUrl2;
+
+    @Column(name = "location2_lat", precision = 10, scale = 7)
+    private BigDecimal location2Lat;
+
+    @Column(name = "location2_lng", precision = 10, scale = 7)
+    private BigDecimal location2Lng;
 }

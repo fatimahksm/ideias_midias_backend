@@ -31,6 +31,11 @@ public class SiteSettingsResponse {
     private String mapEmbedUrl;
     private BigDecimal locationLat;
     private BigDecimal locationLng;
+    private String address2Pt;
+    private String address2En;
+    private String mapEmbedUrl2;
+    private BigDecimal location2Lat;
+    private BigDecimal location2Lng;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }
