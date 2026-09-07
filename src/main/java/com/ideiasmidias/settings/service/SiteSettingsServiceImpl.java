@@ -52,6 +52,11 @@ public class SiteSettingsServiceImpl implements SiteSettingsService {
         siteSettings.setMapEmbedUrl(request.getMapEmbedUrl());
         siteSettings.setLocationLat(request.getLocationLat());
         siteSettings.setLocationLng(request.getLocationLng());
+        siteSettings.setAddress2Pt(request.getAddress2Pt());
+        siteSettings.setAddress2En(request.getAddress2En());
+        siteSettings.setMapEmbedUrl2(request.getMapEmbedUrl2());
+        siteSettings.setLocation2Lat(request.getLocation2Lat());
+        siteSettings.setLocation2Lng(request.getLocation2Lng());
     }
 
     private SiteSettingsResponse mapToResponse(SiteSettings siteSettings) {
@@ -74,6 +79,11 @@ public class SiteSettingsServiceImpl implements SiteSettingsService {
                 .mapEmbedUrl(siteSettings.getMapEmbedUrl())
                 .locationLat(siteSettings.getLocationLat())
                 .locationLng(siteSettings.getLocationLng())
+                .address2Pt(siteSettings.getAddress2Pt())
+                .address2En(siteSettings.getAddress2En())
+                .mapEmbedUrl2(siteSettings.getMapEmbedUrl2())
+                .location2Lat(siteSettings.getLocation2Lat())
+                .location2Lng(siteSettings.getLocation2Lng())
                 .createdAt(siteSettings.getCreatedAt())
                 .updatedAt(siteSettings.getUpdatedAt())
                 .build();
