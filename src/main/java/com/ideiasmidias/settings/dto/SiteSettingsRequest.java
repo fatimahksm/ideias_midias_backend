@@ -53,4 +53,16 @@ public class SiteSettingsRequest {
     @DecimalMin(value = "-180.0", inclusive = true, message = "Longitude must be >= -180")
     @DecimalMax(value = "180.0", inclusive = true, message = "Longitude must be <= 180")
     private BigDecimal locationLng;
+
+    private String address2Pt;
+    private String address2En;
+    private String mapEmbedUrl2;
+
+    @DecimalMin(value = "-90.0", inclusive = true, message = "Latitude must be >= -90")
+    @DecimalMax(value = "90.0", inclusive = true, message = "Latitude must be <= 90")
+    private BigDecimal location2Lat;
+
+    @DecimalMin(value = "-180.0", inclusive = true, message = "Longitude must be >= -180")
+    @DecimalMax(value = "180.0", inclusive = true, message = "Longitude must be <= 180")
+    private BigDecimal location2Lng;
 }
