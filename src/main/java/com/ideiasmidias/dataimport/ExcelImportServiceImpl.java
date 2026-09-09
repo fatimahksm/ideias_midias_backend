@@ -7,6 +7,7 @@ import com.ideiasmidias.category.service.SectionCategoryService;
 import com.ideiasmidias.common.enums.ContactMethodType;
 import com.ideiasmidias.common.enums.ContentBlockType;
 import com.ideiasmidias.common.enums.SectionType;
+import com.ideiasmidias.common.exception.BadRequestException;
 import com.ideiasmidias.contact.dto.ContactMethodRequest;
 import com.ideiasmidias.contact.service.ContactMethodService;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -31,6 +32,8 @@ import com.ideiasmidias.section.entity.Section;
 import com.ideiasmidias.section.repository.SectionRepository;
 import com.ideiasmidias.section.service.SectionService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.poi.EmptyFileException;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.DataFormatter;
@@ -79,6 +82,7 @@ import java.util.Map;
  * admin UI can render a fully editable, dropdown-backed table instead of
  * sending the admin back to the spreadsheet to fix a typo.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ExcelImportServiceImpl implements ExcelImportService {
@@ -227,7 +231,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
     private ImportSummaryResponse run(MultipartFile file, boolean dryRun, String fieldOverridesJson) throws IOException {
         Map<String, String> overrides = parseOverrides(fieldOverridesJson);
 
-        try (Workbook workbook = WorkbookFactory.create(file.getInputStream())) {
+        try (Workbook workbook = openWorkbook(file)) {
             // Sections are referenced by name_en rather than slug: slug is now an
             // internal, backend-generated detail nobody has to type into a sheet.
             Map<String, Long> sectionIdByNameEn = new HashMap<>();
@@ -255,6 +259,35 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             results.add(processContactMethods(workbook, dryRun, overrides));
 
             return new ImportSummaryResponse(!dryRun, results);
+        }
+    }
+
+    /**
+     * Opens the uploaded spreadsheet, turning "this is not a spreadsheet" into a
+     * 400 the owner can act on. POI throws a low-level {@link IOException} for a
+     * PDF, an image or a renamed file, which would otherwise reach the client as
+     * a bare 500 on the Import Data page.
+     */
+    private Workbook openWorkbook(MultipartFile file) throws IOException {
+        if (file == null || file.isEmpty()) {
+            throw new BadRequestException("Please choose an Excel file to import.");
+        }
+
+        try {
+            return WorkbookFactory.create(file.getInputStream());
+        } catch (EmptyFileException ex) {
+            throw new BadRequestException("That file is empty. Please upload the filled-in import template.");
+        } catch (IOException | IllegalArgumentException | IllegalStateException ex) {
+            log.warn(
+                    "Rejected import upload: not a readable spreadsheet. originalName={}, errorType={}, message={}",
+                    file.getOriginalFilename(),
+                    ex.getClass().getSimpleName(),
+                    ex.getMessage()
+            );
+
+            throw new BadRequestException(
+                    "That file is not a valid Excel file. Download the template and upload it as .xlsx."
+            );
         }
     }
 
